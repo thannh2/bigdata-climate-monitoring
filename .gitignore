@@ -1,0 +1,23 @@
+# Biến môi trường & API Keys
+.env
+venv/
+env/
+
+# Python & Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Dữ liệu cục bộ (Rất quan trọng)
+data/
+*.csv
+*.json
+*.parquet
+*.avro
+
+# Log hệ thống (Spark, Kafka, Airflow)
+logs/
+spark-warehouse/
+checkpoint/
+metastore_db/
+derby.log
