@@ -58,6 +58,8 @@ Install dependencies:
 .\.venv\Scripts\python.exe -m pip install -r Ingestion\requirements.txt
 ```
 
+The current `requirements.txt` contains only the runtime packages actually used by the ingestion module, so it is safer to install on newer Python versions.
+
 Start Kafka:
 
 ```powershell
@@ -117,4 +119,4 @@ Validate normalized samples against GE-aligned rules:
 - Keep real API keys only in `Ingestion/config/.env`.
 - Check `Ingestion/docs/README.md` for requirements and design documents.
 - Airflow DAG definitions live in `Ingestion/airflow/ingestion_dag.py`.
-- The current local environment is Python 3.14, so Great Expectations is kept at suite-and-rules level rather than installed locally.
+- The current local environment is Python 3.14, so the dependency set is kept minimal and Great Expectations remains at suite-and-rules level rather than installed locally.
