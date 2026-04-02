@@ -1,0 +1,14 @@
+bootstrap_servers:
+  - localhost:9092
+client_id: climate-monitoring-ingestion
+acks: all
+compression_type: lz4
+linger_ms: 10
+request_timeout_ms: 30000
+consumer_group: climate-monitoring-smoke-test
+topic_defaults:
+  partitions: 3
+  replication_factor: 1
+  retention_ms: 604800000
+  cleanup_policy: delete
+  min_insync_replicas: 1

@@ -1,0 +1,100 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://bigdata-climate-monitoring.local/schemas/weather_normalized.schema.json",
+    "title": "NormalizedWeatherRecord",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "event_id",
+        "source",
+        "region",
+        "city",
+        "station_id",
+        "latitude",
+        "longitude",
+        "event_time",
+        "ingestion_time",
+        "data_version"
+    ],
+    "properties": {
+        "event_id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "source": {
+            "type": "string",
+            "enum": [
+                "open-meteo",
+                "openweathermap"
+            ]
+        },
+        "region": {
+            "type": "string",
+            "enum": [
+                "bac",
+                "trung",
+                "nam"
+            ]
+        },
+        "city": {
+            "type": "string"
+        },
+        "station_id": {
+            "type": "string"
+        },
+        "latitude": {
+            "type": "number"
+        },
+        "longitude": {
+            "type": "number"
+        },
+        "event_time": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "ingestion_time": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "temperature_c": {
+            "type": [
+                "number",
+                "null"
+            ]
+        },
+        "humidity": {
+            "type": [
+                "number",
+                "null"
+            ]
+        },
+        "pressure_hpa": {
+            "type": [
+                "number",
+                "null"
+            ]
+        },
+        "wind_speed_mps": {
+            "type": [
+                "number",
+                "null"
+            ]
+        },
+        "weather_main": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "weather_desc": {
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "data_version": {
+            "type": "string",
+            "const": "v1"
+        }
+    }
+}
