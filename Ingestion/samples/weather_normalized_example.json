@@ -1,0 +1,18 @@
+{
+    "event_id": "550e8400-e29b-41d4-a716-446655440000",
+    "source": "open-meteo",
+    "region": "bac",
+    "city": "Hanoi",
+    "station_id": "hanoi_01",
+    "latitude": 21.0285,
+    "longitude": 105.8542,
+    "event_time": "2026-04-02T14:45:00Z",
+    "ingestion_time": "2026-04-02T10:00:00Z",
+    "temperature_c": 31.6,
+    "humidity": 60,
+    "pressure_hpa": 1006.0,
+    "wind_speed_mps": 3.61,
+    "weather_main": "Partly Cloudy",
+    "weather_desc": "Mainly clear, partly cloudy",
+    "data_version": "v1"
+}

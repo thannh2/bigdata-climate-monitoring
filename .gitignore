@@ -1,23 +1,43 @@
-# Biến môi trường & API Keys
+# Secrets and local environment
 .env
+.env.*
+!.env.example
+Ingestion/config/.env
+
+# Python virtual environments
+.venv/
 venv/
 env/
 
-# Python & Jupyter
+# Python cache and tooling
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Notebook cache
 .ipynb_checkpoints/
 
-# Dữ liệu cục bộ (Rất quan trọng)
-data/
-*.csv
-*.json
-*.parquet
-*.avro
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
 
-# Log hệ thống (Spark, Kafka, Airflow)
+# Local runtime data
+data/
 logs/
-spark-warehouse/
+*.log
 checkpoint/
+spark-warehouse/
 metastore_db/
 derby.log
+
+# Generated data files
+*.parquet
+*.avro

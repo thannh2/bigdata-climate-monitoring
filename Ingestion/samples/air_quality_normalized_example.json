@@ -1,0 +1,20 @@
+{
+    "event_id": "660f9511-f30c-52e5-b827-557766551111",
+    "source": "aqicn",
+    "region": "bac",
+    "city": "Hanoi",
+    "station_id": "aqicn_1437",
+    "latitude": 21.0285,
+    "longitude": 105.8542,
+    "event_time": "2026-04-02T15:00:00Z",
+    "ingestion_time": "2026-04-02T10:00:00Z",
+    "aqi": 137,
+    "quality_level": "Unhealthy for Sensitive Groups",
+    "pm25": 137,
+    "pm10": 59,
+    "co": 6.4,
+    "no2": 11.9,
+    "so2": 4.6,
+    "o3": 100.6,
+    "data_version": "v1"
+}

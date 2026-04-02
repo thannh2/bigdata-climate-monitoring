@@ -1,0 +1,59 @@
+{
+  "suite_name": "weather_input_quality_suite",
+  "expectations": [
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "event_time"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "city"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "source"
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "temperature_c",
+        "min_value": -20,
+        "max_value": 60
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "humidity",
+        "min_value": 0,
+        "max_value": 100
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "wind_speed_mps",
+        "min_value": 0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "pressure_hpa",
+        "min_value": 0,
+        "strict_min": true
+      }
+    }
+  ],
+  "meta": {
+    "owner": "ingestion",
+    "entity": "weather",
+    "stage": "downstream_quality_validation"
+  }
+}

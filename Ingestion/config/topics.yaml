@@ -1,0 +1,19 @@
+topics:
+  - name: weather.raw.batch
+    partitions: 3
+    replication_factor: 1
+  - name: weather.raw.stream
+    partitions: 3
+    replication_factor: 1
+  - name: weather.raw.dlq
+    partitions: 3
+    replication_factor: 1
+  - name: air_quality.raw.batch
+    partitions: 3
+    replication_factor: 1
+  - name: air_quality.raw.stream
+    partitions: 3
+    replication_factor: 1
+  - name: air_quality.raw.dlq
+    partitions: 3
+    replication_factor: 1
