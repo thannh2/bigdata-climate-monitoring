@@ -34,10 +34,17 @@ data/
 logs/
 *.log
 checkpoint/
+exports/
 spark-warehouse/
 metastore_db/
 derby.log
+airflow.cfg
+webserver_config.py
+airflow-webserver.pid
 
 # Generated data files
 *.parquet
 *.avro
+
+# Local-only handover docs
+Ingestion/docs/

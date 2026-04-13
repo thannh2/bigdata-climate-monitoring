@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,9 @@ def load_kafka_config(config_path: Path | None = None) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if "bootstrap_servers" not in data:
         raise ValueError(f"bootstrap_servers is missing in {path}")
+    override = os.getenv("KAFKA_BOOTSTRAP_SERVERS")
+    if override:
+        data["bootstrap_servers"] = [server.strip() for server in override.split(",") if server.strip()]
     return data
 
 

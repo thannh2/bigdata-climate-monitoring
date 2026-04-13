@@ -17,6 +17,7 @@ if str(ROOT_DIR) not in sys.path:
 from producers.dlq_producer import build_dlq_message, send_to_dlq
 from producers.kafka_producer import build_producer, produce_json_message
 from utils.logger import get_logger, log_event
+from utils.locations import OPEN_METEO_LOCATIONS, filter_locations, location_names
 from utils.metadata import build_batch_id, enrich_ingestion_metadata
 from utils.retry import retry_call
 from utils.serialization import serialize_record
@@ -29,14 +30,6 @@ AIR_BATCH_TOPIC = "air_quality.raw.batch"
 AIR_DLQ_TOPIC = "air_quality.raw.dlq"
 OPEN_METEO_AIR_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 PIPELINE_NAME = "air_batch_ingestion"
-LOCATION_CATALOG = [
-    {"city": "Hanoi", "latitude": 21.0285, "longitude": 105.8542},
-    {"city": "Hai Phong", "latitude": 20.8449, "longitude": 106.6881},
-    {"city": "Da Nang", "latitude": 16.0544, "longitude": 108.2022},
-    {"city": "Hue", "latitude": 16.4637, "longitude": 107.5909},
-    {"city": "HCMC", "latitude": 10.7769, "longitude": 106.6964},
-    {"city": "Can Tho", "latitude": 10.0379, "longitude": 105.7869},
-]
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,13 +39,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topic", default=AIR_BATCH_TOPIC)
     parser.add_argument("--dlq-topic", default=AIR_DLQ_TOPIC)
     parser.add_argument("--sleep-seconds", type=float, default=0.2)
-    parser.add_argument("--locations", nargs="*", default=[location["city"] for location in LOCATION_CATALOG])
+    parser.add_argument("--locations", nargs="*", default=location_names(OPEN_METEO_LOCATIONS))
     return parser.parse_args()
-
-
-def filter_locations(selected_locations: list[str]) -> list[dict[str, Any]]:
-    selected = {name.strip().lower() for name in selected_locations}
-    return [location for location in LOCATION_CATALOG if location["city"].lower() in selected]
 
 
 def fetch_air_history(location: dict[str, Any], start_date: str, end_date: str) -> dict[str, Any]:
@@ -108,7 +96,7 @@ def _safe_array_value(values: Any, index: int) -> Any:
 def main() -> None:
     args = parse_args()
     _validate_date_range(args.start_date, args.end_date)
-    locations = filter_locations(args.locations)
+    locations = filter_locations(OPEN_METEO_LOCATIONS, args.locations)
     if not locations:
         raise ValueError("No matching locations were selected")
 
