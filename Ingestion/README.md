@@ -1,42 +1,61 @@
 # Climate Monitoring Ingestion
 
-This module implements the ingestion layer for the climate monitoring pipeline.
+This module is the ingestion boundary of the climate monitoring pipeline. It fetches source data, converts it into a shared schema, applies basic quality checks, and publishes records to Kafka.
 
-## Current scope
+## Architecture
 
-- collect weather and air-quality data
-- normalize source payloads into shared records
-- validate records before publish
-- publish batch and stream records to Kafka
-- route failures and duplicates to DLQ
+```text
+External APIs
+   ->
+Collectors (batch + stream)
+   ->
+Normalize + Validate
+   ->
+Kafka raw topics / DLQ
+   ->
+Downstream consumers
+```
 
-## Implemented
+The main stream pipelines currently use these fallback chains:
+
+- weather: `Open-Meteo -> OpenWeatherMap`
+- air quality: `AQICN -> IQAir`
+
+## Delivered scope
 
 - Kafka local stack via Docker Compose
 - topic creation for raw and DLQ topics
-- smoke test for Kafka producer and consumer
-- weather and air batch collectors
-- weather and air stream collectors with checkpoint-based deduplication
-- structured logging, retry, serialization, and metadata helpers
-- DLQ publishing for fetch, validation, processing, and duplicate failures
-- Airflow DAG scaffolding for batch scheduling and stream trigger cycles
+- historical batch collectors for Open-Meteo weather and air quality
+- streaming collectors for Open-Meteo, OpenWeatherMap, AQICN, and IQAir
+- source fallback in the main stream collectors
+- shared retry, logging, metadata, checkpoint, and serialization helpers
+- DLQ routing for fetch, validation, processing, and duplicate failures
+- Airflow orchestration for batch and stream trigger flows
 - GE-aligned input quality rules for downstream validation
+- Kafka export script for building demo datasets from topics
+
+## Source of truth
+
+- runtime entrypoints: `Ingestion/collectors/`, `Ingestion/scripts/`, `Ingestion/airflow/`
+- shared configuration and path helpers: `Ingestion/utils/runtime_config.py`
+- shared location catalog: `Ingestion/utils/locations.py`
+- normalized schema: `Ingestion/validators/normalized_schema.py`
+- basic validation rules: `Ingestion/validators/`
 
 ## Folder layout
 
 ```text
 Ingestion/
-|-- airflow/        # DAG orchestration
-|-- collectors/     # Batch and stream collectors
-|-- config/         # Kafka and environment configuration
-|-- docs/           # Requirements and design notes
+|-- airflow/        # Airflow DAGs and orchestration notes
+|-- collectors/     # Runtime ingestion entrypoints
+|-- config/         # Kafka and local environment configuration
 |-- great_expectations/
 |-- producers/      # Kafka and DLQ producer helpers
-|-- samples/        # Minimal normalized examples
-|-- scripts/        # Setup, smoke test, source test, quality validation
+|-- samples/        # Minimal normalized sample records
+|-- scripts/        # Topic setup, smoke tests, export, and validation helpers
 |-- tests/          # Placeholder for automated tests
-|-- utils/          # Shared helpers
-|-- validators/     # Normalization and validation logic
+|-- utils/          # Shared runtime helpers and source catalogs
+|-- validators/     # Normalization and basic validation logic
 |-- docker-compose.yml
 `-- requirements.txt
 ```
@@ -76,6 +95,12 @@ Run Kafka smoke test:
 .\.venv\Scripts\python.exe Ingestion\scripts\smoke_test_kafka.py --topic weather.raw.stream
 ```
 
+Export Kafka data to a local JSONL file:
+
+```powershell
+.\.venv\Scripts\python.exe Ingestion\scripts\export_kafka_to_file.py --topics weather.raw.batch air_quality.raw.batch --from-beginning --max-messages 500 --include-kafka-meta
+```
+
 Run weather batch ingestion:
 
 ```powershell
@@ -97,13 +122,7 @@ Run one weather stream cycle:
 Run one air stream cycle:
 
 ```powershell
-.\.venv\Scripts\python.exe Ingestion\collectors\air_stream_collector.py --run-once --locations Hanoi
-```
-
-Validate normalized samples against GE-aligned rules:
-
-```powershell
-.\.venv\Scripts\python.exe Ingestion\scripts\validate_input_quality.py --entity weather --input Ingestion\samples\weather_normalized_example.json
+.\.venv\Scripts\python.exe Ingestion\collectors\aqicn_air_stream_collector.py --run-once --locations Hanoi
 ```
 
 ## Validation model
@@ -112,9 +131,8 @@ Validate normalized samples against GE-aligned rules:
 - Great Expectations is prepared as a downstream quality layer
 - shared thresholds live in `Ingestion/utils/quality_rules.py`
 
-## Notes
+## Handover notes
 
 - Keep real API keys only in `Ingestion/config/.env`.
-- Check `Ingestion/docs/README.md` for requirements and design documents.
 - Airflow DAG definitions live in `Ingestion/airflow/ingestion_dag.py`.
-- The current local environment is Python 3.14, so Great Expectations is kept at suite-and-rules level rather than installed locally.
+- The current local environment is Python 3.14, so the dependency set is intentionally minimal and Great Expectations remains at suite-and-rules level rather than installed locally.
