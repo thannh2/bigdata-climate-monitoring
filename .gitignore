@@ -41,3 +41,10 @@ derby.log
 # Generated data files
 *.parquet
 *.avro
+*.json
+*.jsonl
+*.parquet
+*.csv
+
+# Image
+images/
