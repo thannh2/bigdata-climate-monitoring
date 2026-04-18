@@ -1,0 +1,32 @@
+data_quality:
+  missing_rate:
+    warning: 0.05
+    critical: 0.10
+  duplicate_rate:
+    warning: 0.01
+    critical: 0.03
+  ingestion_delay_p95_seconds:
+    warning: 900
+    critical: 1800
+  station_silence_minutes:
+    warning: 30
+    critical: 60
+  out_of_range_rate:
+    warning: 0.01
+    critical: 0.03
+
+drift:
+  psi:
+    stable_max: 0.10
+    warning_max: 0.25
+
+performance:
+  regression:
+    mae_increase_warning: 0.10
+    mae_increase_critical: 0.20
+    mae_high_pollution_increase_critical: 0.25
+  classification:
+    recall_drop_warning_pp: 5
+    recall_drop_critical_pp: 10
+    auprc_drop_warning: 0.10
+    auprc_drop_critical: 0.20

@@ -48,3 +48,5 @@ airflow-webserver.pid
 
 # Local-only handover docs
 Ingestion/docs/
+
+air_quality_mllib_mlflow_spec.md

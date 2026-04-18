@@ -1,0 +1,28 @@
+required_columns:
+  - station_id
+  - region
+  - city
+  - event_time
+  - ingestion_time
+  - latitude
+  - longitude
+  - data_version
+
+range_rules:
+  humidity:
+    min: 0
+    max: 100
+  wind_speed_mps:
+    min: 0
+    max: 100
+  pressure_hpa:
+    min: 850
+    max: 1100
+  pm25:
+    min: 0
+    max: 1000
+
+duplicate_key:
+  - station_id
+  - event_time
+  - source
