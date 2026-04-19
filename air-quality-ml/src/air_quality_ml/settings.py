@@ -15,10 +15,7 @@ class SparkConfig(BaseModel):
 
 
 class DataPaths(BaseModel):
-    silver_weather_path: str
-    silver_air_path: str
-    gold_features_path: str
-    gold_targets_path: str
+    features_path: str
     gold_predictions_path: str
     gold_eval_path: str
     monitoring_path: str
@@ -96,7 +93,20 @@ def load_job_config(config_path: str | Path) -> JobConfig:
 
 
 def resolve_path(base_dir: str | Path, path_value: str) -> Path:
+    """
+    Resolve path relative to base_dir.
+    
+    Args:
+        base_dir: Base directory (usually config file's parent directory)
+        path_value: Path value from config (can be relative or absolute)
+    
+    Returns:
+        Resolved absolute path
+    """
     p = Path(path_value)
     if p.is_absolute():
         return p
-    return (Path(base_dir) / p).resolve()
+    
+    # Resolve relative to base_dir
+    resolved = (Path(base_dir) / p).resolve()
+    return resolved

@@ -1,48 +1,47 @@
+# Features từ processing/transform_feature.py
+
+# L0 - Raw features
 numeric_features:
   - latitude
   - longitude
-  - temperature_c
+  - temp_c
   - humidity
-  - pressure_hpa
-  - surface_pressure_hpa
-  - wind_speed_mps
-  - wind_direction_deg
-  - precipitation_mm
-  - cloud_cover_pct
-  - shortwave_radiation_wm2
-  - soil_temperature_0_to_7cm_c
-  - pm25
-  - pm10
-  - aqi
-  - co
-  - no2
-  - so2
-  - o3
+  - pressure
+  - wind_speed
+  - wind_dir
+  - precipitation
+  - cloud_cover
+  - shortwave_radiation
+  - soil_temperature
+  - pm2_5
+  - us_aqi
 
 categorical_features:
   - region
   - city
-  - weather_main
 
-engineered_features:
+# L1 - Engineered features cơ bản
+l1_features:
+  - coord_X
+  - coord_Y
+  - coord_Z
+  - wind_U
+  - wind_V
+  - air_density
+  - dew_point
   - hour_sin
   - hour_cos
-  - dow_sin
-  - dow_cos
-  - coord_x
-  - coord_y
-  - coord_z
-  - wind_u
-  - wind_v
-  - dew_point
+
+# L2 - Domain-specific features
+l2_features:
+  - theta_e
   - is_stagnant_air
+  - cooling_degree_days
+
+# L3 - Time-series features
+l3_features:
   - pressure_delta_3h
-  - pm25_lag_1h
-  - pm25_lag_3h
-  - pm25_lag_6h
-  - aqi_lag_1h
-  - aqi_lag_6h
+  - wind_shear_U
+  - wind_shear_V
   - temp_mean_6h
-  - humidity_mean_6h
-  - wind_speed_mean_6h
   - pm25_acc_12h

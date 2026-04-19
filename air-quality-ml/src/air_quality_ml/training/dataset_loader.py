@@ -19,5 +19,6 @@ def prepare_training_frame(df: DataFrame, target_col: str, dropna_label: bool = 
     if dropna_label:
         out = out.filter(F.col(target_col).isNotNull())
 
-    out = out.filter(F.col("event_hour").isNotNull())
+    # Sử dụng timestamp thay vì event_hour
+    out = out.filter(F.col("timestamp").isNotNull())
     return out

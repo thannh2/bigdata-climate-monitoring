@@ -3,68 +3,76 @@ from __future__ import annotations
 from pyspark.sql import DataFrame
 
 
+# L0 - Raw features từ transform_feature.py
 BASE_NUMERIC_FEATURES = [
     "latitude",
     "longitude",
-    "temperature_c",
+    "temp_c",
     "humidity",
-    "pressure_hpa",
-    "surface_pressure_hpa",
-    "wind_speed_mps",
-    "wind_direction_deg",
-    "precipitation_mm",
-    "cloud_cover_pct",
-    "shortwave_radiation_wm2",
-    "soil_temperature_0_to_7cm_c",
-    "pm25",
-    "pm10",
-    "aqi",
-    "co",
-    "no2",
-    "so2",
-    "o3",
+    "pressure",
+    "wind_speed",
+    "wind_dir",
+    "precipitation",
+    "cloud_cover",
+    "shortwave_radiation",
+    "soil_temperature",
+    "pm2_5",
+    "us_aqi",
 ]
 
-ENGINEERED_NUMERIC_FEATURES = [
+# L1 - Engineered features cơ bản
+L1_FEATURES = [
+    "coord_X",
+    "coord_Y",
+    "coord_Z",
+    "wind_U",
+    "wind_V",
+    "air_density",
+    "dew_point",
     "hour_sin",
     "hour_cos",
-    "dow_sin",
-    "dow_cos",
-    "coord_x",
-    "coord_y",
-    "coord_z",
-    "wind_u",
-    "wind_v",
-    "dew_point",
+]
+
+# L2 - Domain-specific features
+L2_FEATURES = [
+    "theta_e",
     "is_stagnant_air",
+    "cooling_degree_days",
+]
+
+# L3 - Time-series features
+L3_FEATURES = [
     "pressure_delta_3h",
-    "pm25_lag_1h",
-    "pm25_lag_3h",
-    "pm25_lag_6h",
-    "aqi_lag_1h",
-    "aqi_lag_6h",
+    "wind_shear_U",
+    "wind_shear_V",
     "temp_mean_6h",
-    "humidity_mean_6h",
-    "wind_speed_mean_6h",
     "pm25_acc_12h",
 ]
+
+ENGINEERED_NUMERIC_FEATURES = L1_FEATURES + L2_FEATURES + L3_FEATURES
 
 CATEGORICAL_FEATURES = [
     "region",
     "city",
-    "weather_main",
 ]
 
 
 def get_default_feature_columns(df: DataFrame, target_col: str) -> tuple[list[str], list[str]]:
+    """
+    Lấy danh sách features mặc định, loại bỏ metadata và target columns
+    """
     excluded = {
         target_col,
-        "event_hour",
-        "ingestion_time",
+        "timestamp",
         "station_id",
-        "weather_data_version",
-        "air_data_version",
+        "year",
+        "month",
+        "hour",
+        "elevation",
     }
+    
+    # Loại bỏ tất cả target columns
+    excluded.update([c for c in df.columns if c.startswith("target_")])
 
     numeric = [c for c in (BASE_NUMERIC_FEATURES + ENGINEERED_NUMERIC_FEATURES) if c in df.columns and c not in excluded]
     categorical = [c for c in CATEGORICAL_FEATURES if c in df.columns and c not in excluded]
