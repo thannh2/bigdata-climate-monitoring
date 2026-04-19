@@ -1,20 +1,20 @@
 task: classification
-horizon: 3
-target_col: target_alert_3h
+horizon: 12
+target_col: target_alert_12h
 prediction_col: prediction
 probability_col: probability
 model_type: gbt
-model_name: aq_alert_classifier_h3
-experiment_name: air-quality/alert-classifier/h3
+model_name: aq_alert_classifier_h12
+experiment_name: air-quality/alert-classifier/h12
 
 training:
-  label_col: target_alert_3h
+  label_col: target_alert_12h
   max_rows: null
   dropna_label: true
 
 params:
-  maxDepth: 6
-  maxIter: 100
+  maxDepth: 8
+  maxIter: 140
   stepSize: 0.05
 
 threshold_tuning:

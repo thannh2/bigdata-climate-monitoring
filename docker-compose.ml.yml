@@ -1,0 +1,19 @@
+services:
+  air-quality-ml:
+    build:
+      context: ./air-quality-ml
+      dockerfile: Dockerfile
+    image: air-quality-ml:local
+    working_dir: /workspace/air-quality-ml
+    environment:
+      MLFLOW_TRACKING_URI: http://host.docker.internal:5000
+      PYARROW_IGNORE_TIMEZONE: "1"
+      PYSPARK_PYTHON: python
+      PYSPARK_DRIVER_PYTHON: python
+      SPARK_LOCAL_IP: 127.0.0.1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./air-quality-ml:/workspace/air-quality-ml
+      - ./Data:/workspace/Data
+    command: ["python", "jobs/build_gold_features_targets.py"]

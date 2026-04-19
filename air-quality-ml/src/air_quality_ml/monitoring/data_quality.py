@@ -32,7 +32,7 @@ def duplicate_rate(df: DataFrame, key_cols: list[str]) -> DataFrame:
     )
 
 
-def ingestion_delay_stats(df: DataFrame, event_col: str = "event_hour", ingestion_col: str = "ingestion_time") -> DataFrame:
+def ingestion_delay_stats(df: DataFrame, event_col: str = "timestamp", ingestion_col: str = "ingestion_time") -> DataFrame:
     delay_col = F.unix_timestamp(F.col(ingestion_col)) - F.unix_timestamp(F.col(event_col))
     return df.select(delay_col.alias("event_delay_seconds")).agg(
         F.avg("event_delay_seconds").alias("avg_delay_seconds"),
@@ -41,7 +41,7 @@ def ingestion_delay_stats(df: DataFrame, event_col: str = "event_hour", ingestio
     )
 
 
-def station_silence(df: DataFrame, station_col: str = "station_id", event_col: str = "event_hour") -> DataFrame:
+def station_silence(df: DataFrame, station_col: str = "station_id", event_col: str = "timestamp") -> DataFrame:
     latest = df.groupBy(station_col).agg(F.max(event_col).alias("last_event_time"))
     return latest.withColumn(
         "silence_minutes",

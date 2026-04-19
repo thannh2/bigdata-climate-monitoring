@@ -12,9 +12,11 @@ data:
   # Dữ liệu đã transform sẵn từ processing/transform_feature.py
   # Path từ configs/ lên root: configs/ -> air-quality-ml/ -> root/ -> Data/
   features_path: ../../Data/extracted features/features
+  curated_dataset_path: ../../Data/gold/curated_ml_dataset
   gold_predictions_path: ../../Data/gold/predictions
   gold_eval_path: ../../Data/gold/prediction_eval
   monitoring_path: ../../Data/gold/monitoring
+  contract_reports_path: ../../Data/gold/data_contract
 
 mlflow:
   tracking_uri: http://localhost:5000
@@ -25,6 +27,31 @@ features:
   horizons: [1, 6, 12, 24]  # Horizons có trong dữ liệu transform
   alert_pm25_threshold: 35.0
   high_pollution_threshold: 75.0
+
+storage:
+  curated_format: delta
+  predictions_format: delta
+  eval_format: delta
+  monitoring_format: delta
+
+data_contract:
+  enabled: true
+  fail_on_error: true
+  run_pandera: true
+  pandera_sample_rows: 1000
+  required_core_columns:
+    - station_id
+    - timestamp
+    - latitude
+    - longitude
+    - temp_c
+    - humidity
+    - pressure
+    - wind_speed
+    - pm2_5
+    - us_aqi
+  duplicate_key_columns: [station_id, timestamp]
+  allowed_regions: [bac, trung, nam, unknown]
 
 split:
   timestamp_col: timestamp

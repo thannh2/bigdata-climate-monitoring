@@ -1,0 +1,21 @@
+task: regression
+horizon: 12
+target_col: target_pm25_12h
+prediction_col: prediction
+model_type: gbt
+model_name: aq_pm25_forecast_h12
+experiment_name: air-quality/forecast-pm25/h12
+threshold_col: null
+
+training:
+  label_col: target_pm25_12h
+  max_rows: null
+  dropna_label: true
+
+params:
+  maxDepth: 8
+  maxIter: 140
+  stepSize: 0.05
+  subsamplingRate: 0.85
+
+register_if_pass: true

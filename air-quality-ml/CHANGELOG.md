@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.1.0] - 2026-04-19
+
+### 🧹 Codebase Cleanup
+
+**Removed deprecated/unused modules:**
+- ❌ `processing/normalize_weather.py` - Data already normalized
+- ❌ `processing/normalize_air_quality.py` - Data already normalized
+- ❌ `processing/join_sources.py` - Data already joined
+- ❌ `processing/build_features.py` - Features already built
+- ❌ `processing/build_targets.py` - Targets already in data
+- ❌ `analytics/` - Module not used anywhere
+- ❌ `data_contract/` - Module not used anywhere
+- ❌ `serving/` - Module not used anywhere
+- ❌ `features/lag_features.py` - Not used
+- ❌ `features/rolling_features.py` - Not used
+- ❌ `features/quality_checks.py` - Not used
+
+**Removed horizon 3h (not in data):**
+- ❌ `jobs/train_pm25_h3.py`
+- ❌ `jobs/train_alert_h3.py`
+- ❌ `configs/training_pm25_h3.yaml`
+- ❌ `configs/alert_h3.yaml`
+- ❌ `configs/data_contract.yaml`
+- ❌ `tests/test_build_targets.py`
+
+**Added:**
+- ✅ `.gitignore` - Proper gitignore for Python/ML project
+- ✅ Updated README.md - Clear, practical, beginner-friendly
+
+**Changed:**
+- 🔄 `settings.py` - Default horizons: [1,3,6] → [1,6,12,24]
+
+**Result:**
+- 📉 Removed 25+ unused files
+- 📉 Removed 3 unused modules (analytics, data_contract, serving)
+- ✅ Cleaner codebase
+- ✅ Easier to understand
+- ✅ Better documentation
+
 ## [2.0.0] - 2026-04-19
 
 ### 🎯 Major Refactoring: Simplified Pipeline

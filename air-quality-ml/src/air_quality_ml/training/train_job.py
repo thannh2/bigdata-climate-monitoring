@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 import mlflow
@@ -21,6 +22,7 @@ from air_quality_ml.training.registry import should_promote_classification, shou
 from air_quality_ml.training.splitters import time_based_split
 from air_quality_ml.training.thresholding import apply_threshold, tune_binary_threshold, with_probability_score
 from air_quality_ml.utils.logger import get_logger, log_event
+from air_quality_ml.utils.parquet_io import get_dataset_version, write_dataset_safe
 from air_quality_ml.utils.spark import create_spark_session
 
 
@@ -32,7 +34,7 @@ def parse_args() -> argparse.Namespace:
         "--data-path",
         required=False,
         default=None,
-        help="Optional override for training table path. Default uses base config gold_targets_path.",
+        help="Optional override for training table path. Default uses base config curated_dataset_path.",
     )
     return parser.parse_args()
 
@@ -58,13 +60,21 @@ def _prepare_training_data(args: argparse.Namespace):
     base_settings = load_base_settings(base_config_path)
     job_settings = load_job_config(job_config_path)
 
-    data_path_cfg = args.data_path or base_settings.data.gold_targets_path
+    data_path_cfg = args.data_path or base_settings.data.curated_dataset_path
     data_path = str(resolve_path(base_config_path.parent, data_path_cfg))
 
     return base_settings, job_settings, data_path
 
 
-def _common_params(base_settings, job_settings, numeric_features, categorical_features, data_path: str) -> dict[str, str]:
+def _common_params(
+    base_settings,
+    job_settings,
+    numeric_features,
+    categorical_features,
+    data_path: str,
+    data_format: str,
+    dataset_version: str | None,
+) -> dict[str, str]:
     params: dict[str, str] = {
         "task": job_settings.task,
         "horizon": str(job_settings.horizon),
@@ -72,6 +82,8 @@ def _common_params(base_settings, job_settings, numeric_features, categorical_fe
         "model_type": job_settings.model_type,
         "model_name": job_settings.model_name,
         "data_path": data_path,
+        "data_format": data_format,
+        "dataset_version": dataset_version or "unknown",
         "feature_count_numeric": str(len(numeric_features)),
         "feature_count_categorical": str(len(categorical_features)),
         "environment": base_settings.environment,
@@ -82,19 +94,69 @@ def _common_params(base_settings, job_settings, numeric_features, categorical_fe
     return params
 
 
+def _write_eval_snapshot(
+    spark,
+    base_settings,
+    job_settings,
+    val_metrics: dict[str, float],
+    test_metrics: dict[str, float],
+    run_id: str,
+    data_path: str,
+    data_format: str,
+    dataset_version: str | None,
+    eval_path: str,
+) -> None:
+    rows: list[dict[str, str | float | int | None]] = []
+    recorded_at = datetime.now(timezone.utc).isoformat()
+    for split_name, metrics in [("val", val_metrics), ("test", test_metrics)]:
+        for metric_name, metric_value in metrics.items():
+            rows.append(
+                {
+                    "recorded_at": recorded_at,
+                    "run_id": run_id,
+                    "task": job_settings.task,
+                    "model_name": job_settings.model_name,
+                    "horizon": int(job_settings.horizon),
+                    "split": split_name,
+                    "metric_name": metric_name,
+                    "metric_value": float(metric_value),
+                    "data_path": data_path,
+                    "data_format": data_format,
+                    "dataset_version": dataset_version,
+                }
+            )
+
+    if not rows:
+        return
+
+    eval_df = spark.createDataFrame(rows)
+    write_dataset_safe(
+        eval_df,
+        eval_path,
+        dataset_format=base_settings.storage.eval_format,
+        mode="append",
+        partition_cols=["task", "model_name", "horizon", "split"],
+    )
+
+
 def main() -> None:
     args = parse_args()
     logger = get_logger("air_quality_ml.train_job")
 
     base_settings, job_settings, data_path = _prepare_training_data(args)
+    base_config_path = Path(args.base_config).resolve()
+    eval_path = str(resolve_path(base_config_path.parent, base_settings.data.gold_eval_path))
 
     spark = create_spark_session(base_settings)
     try:
         log_event(logger, "training_start", job_config=args.job_config, data_path=data_path)
+        data_format = base_settings.storage.curated_format
+        dataset_version = get_dataset_version(spark, data_path, data_format)
 
         raw_df = load_training_table(
             spark,
             path=data_path,
+            dataset_format=data_format,
             max_rows=job_settings.training.get("max_rows"),
         )
         dataset = prepare_training_frame(
@@ -127,10 +189,25 @@ def main() -> None:
             "task": job_settings.task,
             "horizon": str(job_settings.horizon),
             "data_path": data_path,
+            "data_format": data_format,
+            "dataset_version": dataset_version or "unknown",
         }
 
         with start_training_run(run_name=_to_run_name(job_settings.model_name, job_settings.horizon), tags=tags) as run:
-            mlflow.log_params(_common_params(base_settings, job_settings, numeric_features, categorical_features, data_path))
+            mlflow.log_params(
+                _common_params(
+                    base_settings,
+                    job_settings,
+                    numeric_features,
+                    categorical_features,
+                    data_path,
+                    data_format,
+                    dataset_version,
+                )
+            )
+            mlflow.log_param("data_format", data_format)
+            if dataset_version is not None:
+                mlflow.log_param("dataset_version", dataset_version)
             _log_dataset_stats(train_df, val_df, test_df)
             log_json_artifact(
                 "selected_features.json",
@@ -194,7 +271,13 @@ def main() -> None:
                 )
 
                 sample_predictions = (
-                    test_pred.select("station_id", "event_hour", job_settings.target_col, job_settings.prediction_col)
+                    test_pred.select(
+                        *[
+                            column
+                            for column in ["station_id", "timestamp", job_settings.target_col, job_settings.prediction_col]
+                            if column in test_pred.columns
+                        ]
+                    )
                     .limit(200)
                     .toPandas()
                     .to_dict(orient="records")
@@ -289,11 +372,11 @@ def main() -> None:
 
                 sample_predictions = (
                     test_eval_df.select(
-                        "station_id",
-                        "event_hour",
-                        job_settings.target_col,
-                        "pred_prob",
-                        job_settings.prediction_col,
+                        *[
+                            column
+                            for column in ["station_id", "timestamp", job_settings.target_col, "pred_prob", job_settings.prediction_col]
+                            if column in test_eval_df.columns
+                        ]
                     )
                     .limit(200)
                     .toPandas()
@@ -309,6 +392,19 @@ def main() -> None:
                 model_version = try_register_logged_model(job_settings.model_name, run_id=run.info.run_id, artifact_path="model")
                 if model_version:
                     mlflow.set_tag("model_version", model_version)
+
+            _write_eval_snapshot(
+                spark=spark,
+                base_settings=base_settings,
+                job_settings=job_settings,
+                val_metrics=val_metrics,
+                test_metrics=test_metrics,
+                run_id=run.info.run_id,
+                data_path=data_path,
+                data_format=data_format,
+                dataset_version=dataset_version,
+                eval_path=eval_path,
+            )
 
             mlflow.set_tag("registered_model_name", job_settings.model_name)
             mlflow.set_tag("registered_model_version", model_version or "not_registered")

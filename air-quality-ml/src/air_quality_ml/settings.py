@@ -16,9 +16,11 @@ class SparkConfig(BaseModel):
 
 class DataPaths(BaseModel):
     features_path: str
+    curated_dataset_path: str
     gold_predictions_path: str
     gold_eval_path: str
     monitoring_path: str
+    contract_reports_path: str
 
 
 class MlflowConfig(BaseModel):
@@ -28,7 +30,7 @@ class MlflowConfig(BaseModel):
 
 
 class SplitConfig(BaseModel):
-    timestamp_col: str = "event_hour"
+    timestamp_col: str = "timestamp"
     train_end: str
     val_end: str
 
@@ -42,9 +44,39 @@ class PromotionConfig(BaseModel):
 
 
 class FeatureDefaults(BaseModel):
-    horizons: list[int] = Field(default_factory=lambda: [1, 3, 6])
+    horizons: list[int] = Field(default_factory=lambda: [1, 6, 12, 24])
     alert_pm25_threshold: float = 35.0
     high_pollution_threshold: float = 75.0
+
+
+class StorageConfig(BaseModel):
+    curated_format: str = "delta"
+    predictions_format: str = "delta"
+    eval_format: str = "delta"
+    monitoring_format: str = "delta"
+
+
+class DataContractConfig(BaseModel):
+    enabled: bool = True
+    fail_on_error: bool = True
+    run_pandera: bool = True
+    pandera_sample_rows: int = 1000
+    required_core_columns: list[str] = Field(
+        default_factory=lambda: [
+            "station_id",
+            "timestamp",
+            "latitude",
+            "longitude",
+            "temp_c",
+            "humidity",
+            "pressure",
+            "wind_speed",
+            "pm2_5",
+            "us_aqi",
+        ]
+    )
+    duplicate_key_columns: list[str] = Field(default_factory=lambda: ["station_id", "timestamp"])
+    allowed_regions: list[str] = Field(default_factory=lambda: ["bac", "trung", "nam", "unknown"])
 
 
 class BaseSettings(BaseModel):
@@ -55,6 +87,8 @@ class BaseSettings(BaseModel):
     data: DataPaths
     mlflow: MlflowConfig
     features: FeatureDefaults
+    storage: StorageConfig = Field(default_factory=StorageConfig)
+    data_contract: DataContractConfig = Field(default_factory=DataContractConfig)
     split: SplitConfig
     promotion: PromotionConfig
 

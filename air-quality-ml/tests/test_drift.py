@@ -13,9 +13,9 @@ def test_calculate_psi_non_negative():
 
 
 def test_compute_feature_drift_has_status():
-    train_df = pd.DataFrame({"pm25": [10, 20, 30, 40], "humidity": [50, 55, 60, 65]})
-    serving_df = pd.DataFrame({"pm25": [20, 30, 40, 60], "humidity": [50, 56, 62, 68]})
+    train_df = pd.DataFrame({"pm2_5": [10, 20, 30, 40], "humidity": [50, 55, 60, 65]})
+    serving_df = pd.DataFrame({"pm2_5": [20, 30, 40, 60], "humidity": [50, 56, 62, 68]})
 
-    out = compute_feature_drift(train_df, serving_df, features=["pm25", "humidity"])
+    out = compute_feature_drift(train_df, serving_df, features=["pm2_5", "humidity"])
     assert set(out.columns) >= {"feature_name", "psi", "status"}
     assert len(out) == 2

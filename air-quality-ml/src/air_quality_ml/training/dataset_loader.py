@@ -3,9 +3,16 @@ from __future__ import annotations
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from air_quality_ml.utils.parquet_io import read_dataset_safe
 
-def load_training_table(spark: SparkSession, path: str, max_rows: int | None = None) -> DataFrame:
-    df = spark.read.parquet(path)
+
+def load_training_table(
+    spark: SparkSession,
+    path: str,
+    dataset_format: str = "parquet",
+    max_rows: int | None = None,
+) -> DataFrame:
+    df = read_dataset_safe(spark, path, dataset_format=dataset_format)
     if max_rows and max_rows > 0:
         return df.limit(int(max_rows))
     return df

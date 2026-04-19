@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-import os
+from typing import Optional
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from air_quality_ml.utils.parquet_io import read_parquet_safe
 
-def load_and_prepare_features(spark, features_path: str, use_pandas_workaround: bool = None) -> DataFrame:
+
+def load_and_prepare_features(
+    spark, 
+    features_path: str, 
+    use_pandas_workaround: Optional[bool] = None
+) -> DataFrame:
     """
     Load features đã transform từ processing/transform_feature.py
     
@@ -24,35 +30,18 @@ def load_and_prepare_features(spark, features_path: str, use_pandas_workaround: 
     - L3: pressure_delta_3h, wind_shear_U/V, temp_mean_6h, pm25_acc_12h
     - L4: target_pm25_[1,6,12,24]h, target_temp_*, target_inversion_*, etc.
     """
-    # Auto-detect: use pandas workaround on Windows by default
-    if use_pandas_workaround is None:
-        use_pandas_workaround = (os.name == 'nt')
-    
-    if use_pandas_workaround:
-        # Workaround for Windows winutils issue
-        print("[INFO] Using pandas workaround to read parquet files (Windows compatibility)")
-        import pandas as pd
-        from pathlib import Path
-        
-        path_obj = Path(features_path)
-        if path_obj.is_file():
-            df_pandas = pd.read_parquet(path_obj)
-        else:
-            # Directory with parquet files (may be partitioned)
-            parquet_files = list(path_obj.rglob("*.parquet"))  # Recursive search
-            if not parquet_files:
-                raise FileNotFoundError(f"No parquet files found in {path_obj}")
-            
-            print(f"[INFO] Found {len(parquet_files)} parquet files, reading...")
-            dfs = [pd.read_parquet(f) for f in parquet_files]
-            df_pandas = pd.concat(dfs, ignore_index=True)
-        
-        df = spark.createDataFrame(df_pandas)
-    else:
-        df = spark.read.parquet(features_path)
+    # Use centralized parquet reader with Windows compatibility
+    df = read_parquet_safe(spark, features_path, use_pandas_workaround)
     
     # Đảm bảo timestamp đúng format
     df = df.withColumn("timestamp", F.to_timestamp("timestamp"))
+
+    if "year" not in df.columns:
+        df = df.withColumn("year", F.year("timestamp"))
+    if "month" not in df.columns:
+        df = df.withColumn("month", F.month("timestamp"))
+    if "hour" not in df.columns:
+        df = df.withColumn("hour", F.hour("timestamp"))
     
     # Thêm cột region/city nếu chưa có (map từ station_id)
     # Giả định: station_id có format như "Hanoi", "Da Nang", etc.

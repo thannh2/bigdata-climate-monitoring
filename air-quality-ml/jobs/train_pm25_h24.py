@@ -16,7 +16,7 @@ def main() -> int:
         "--base-config",
         str(ROOT / "configs" / "base.yaml"),
         "--job-config",
-        str(ROOT / "configs" / "training_pm25_h3.yaml"),
+        str(ROOT / "configs" / "training_pm25_h24.yaml"),
     ]
     return subprocess.call(cmd)
 

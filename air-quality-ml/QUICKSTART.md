@@ -41,6 +41,9 @@ AVAILABLE TARGETS:
 ### Bước 3: Training đầu tiên
 
 ```bash
+# Build curated ML dataset từ Data/ trước
+python jobs/build_gold_features_targets.py
+
 # Train PM2.5 forecast cho horizon 1h
 python jobs/train_pm25_h1.py
 ```
@@ -78,6 +81,8 @@ python jobs/train_pm25_h24.py
 # Alert classifier
 python jobs/train_alert_h1.py
 python jobs/train_alert_h6.py
+python jobs/train_alert_h12.py
+python jobs/train_alert_h24.py
 ```
 
 ## 📊 Hiểu về dữ liệu
@@ -195,12 +200,13 @@ data:
   features_path: ../Data/extracted features/features
 ```
 
-### Lỗi: Spark out of memory
+### Lỗi: Spark chạy chậm hoặc thiếu tài nguyên
 
 ```bash
-# Tăng driver memory trong configs/base.yaml
+# Điều chỉnh Spark runtime trong configs/base.yaml
 spark:
-  driver_memory: 8g  # Tăng từ 4g
+  master: local[*]
+  shuffle_partitions: 32
 ```
 
 ### MLflow không kết nối được

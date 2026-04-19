@@ -1,0 +1,26 @@
+task: classification
+horizon: 24
+target_col: target_alert_24h
+prediction_col: prediction
+probability_col: probability
+model_type: gbt
+model_name: aq_alert_classifier_h24
+experiment_name: air-quality/alert-classifier/h24
+
+training:
+  label_col: target_alert_24h
+  max_rows: null
+  dropna_label: true
+
+params:
+  maxDepth: 8
+  maxIter: 160
+  stepSize: 0.05
+
+threshold_tuning:
+  enabled: true
+  min_precision: 0.35
+  min_recall: 0.80
+  default_threshold: 0.50
+
+register_if_pass: true
