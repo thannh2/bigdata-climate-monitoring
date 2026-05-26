@@ -31,11 +31,11 @@ from utils.checkpoint import (
 )
 from utils.env import load_env_file
 from utils.logger import get_logger, log_event
-from utils.locations import AQICN_LOCATIONS, filter_locations, location_names
+from utils.locations import AQICN_LOCATIONS, IQAIR_LOCATIONS, filter_locations, location_names
 from utils.metadata import build_cycle_id, enrich_ingestion_metadata
 from utils.retry import retry_call
 from utils.runtime_config import ENV_PATH, build_checkpoint_path
-from utils.serialization import serialize_record
+from utils.serialization import model_to_dict, serialize_record
 from validators.air_validator import validate_air_record
 from validators.normalized_schema import normalize_air_quality
 
@@ -95,6 +95,19 @@ def _resolve_iqair_fallback_api_key() -> str | None:
 
 
 def _to_iqair_location(location: dict[str, Any]) -> dict[str, Any]:
+    target_names = {str(location["city"]).strip().lower()}
+    alias = location.get("alias")
+    if alias:
+        target_names.add(str(alias).strip().lower())
+
+    for iqair_location in IQAIR_LOCATIONS:
+        candidates = {str(iqair_location["city"]).strip().lower()}
+        iqair_alias = iqair_location.get("alias")
+        if iqair_alias:
+            candidates.add(str(iqair_alias).strip().lower())
+        if candidates & target_names:
+            return iqair_location
+
     return {
         "city": location["city"],
         "state": location.get("state", location["city"]),
@@ -111,7 +124,7 @@ def _fetch_primary_or_fallback(
 
     try:
         payload = fetch_aqicn_current(location, aqicn_api_key)
-        normalized = normalize_air_quality(payload, source="aqicn").dict()
+        normalized = model_to_dict(normalize_air_quality(payload, source="aqicn"))
         serialized = serialize_record(normalized)
         validation_errors = validate_air_record(normalized)
         if validation_errors:
@@ -126,7 +139,7 @@ def _fetch_primary_or_fallback(
     try:
         iqair_location = _to_iqair_location(location)
         payload = fetch_iqair_current(iqair_location, iqair_api_key)
-        normalized = normalize_air_quality(payload, source="iqair").dict()
+        normalized = model_to_dict(normalize_air_quality(payload, source="iqair"))
         serialized = serialize_record(normalized)
         validation_errors = validate_air_record(normalized)
         if validation_errors:
@@ -188,18 +201,6 @@ def main() -> None:
                             "aqicn_air_skipped_duplicate",
                             city=location["city"],
                             event_time=event_time,
-                        )
-                        _send_dlq_event(
-                            producer=producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="duplicate_record",
-                            error_message="Duplicate AQICN air record skipped",
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=location["city"],
-                            event_time=event_time,
-                            topic=args.topic,
-                            source=source_name,
                         )
                         continue
 

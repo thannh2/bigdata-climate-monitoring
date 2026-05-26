@@ -5,7 +5,7 @@ acks: all
 compression_type: lz4
 linger_ms: 10
 request_timeout_ms: 30000
-consumer_group: climate-monitoring-smoke-test
+consumer_group: climate-monitoring-ingestion
 topic_defaults:
   partitions: 3
   replication_factor: 1

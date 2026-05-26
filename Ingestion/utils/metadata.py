@@ -4,16 +4,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 
-def build_batch_id(prefix: str, start_date: str | None = None, end_date: str | None = None) -> str:
-    parts = [prefix]
-    if start_date:
-        parts.append(start_date.replace("-", ""))
-    if end_date:
-        parts.append(end_date.replace("-", ""))
-    parts.append(datetime.now(UTC).strftime("%Y%m%d_%H%M%S"))
-    return "_".join(parts)
-
-
 def build_cycle_id(prefix: str) -> str:
     return f"{prefix}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}"
 

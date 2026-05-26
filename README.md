@@ -1,6 +1,6 @@
 # Big Data Climate Monitoring
 
-This repository currently packages the ingestion layer of a climate monitoring pipeline. The implemented module collects weather and air-quality data from external APIs, normalizes records, validates them, and publishes them to Kafka for downstream systems.
+This repository packages the streaming ingestion layer of a climate monitoring pipeline. The implemented module collects live weather and air-quality data from real external APIs, normalizes records, validates them, and publishes them to Kafka for downstream systems.
 
 ## Start here
 
@@ -8,13 +8,12 @@ This repository currently packages the ingestion layer of a climate monitoring p
 
 ## Current delivered scope
 
-- local Kafka stack and topic bootstrap
-- historical batch ingestion for Open-Meteo weather and air quality
+- local Kafka stack and stream topic bootstrap
 - streaming ingestion for Open-Meteo, OpenWeatherMap, AQICN, and IQAir
-- source fallback in the main stream pipelines
+- source fallback in the production stream pipelines
 - shared normalization, validation, metadata, DLQ, and checkpoint handling
-- Airflow orchestration for batch and streaming trigger flows
-- Kafka export script for producing demo datasets
+- Airflow orchestration for streaming trigger flows
+- Kafka export script for real topic data
 
 ## Repository layout
 
