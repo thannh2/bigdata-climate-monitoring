@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from uuid import uuid4
 from pathlib import Path
 
@@ -45,7 +46,7 @@ def main() -> None:
 
     spark = create_spark_session(settings)
     try:
-        mlflow.set_tracking_uri(settings.mlflow.tracking_uri)
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI") or settings.mlflow.tracking_uri)
 
         features_df = read_dataset_safe(spark, input_path, dataset_format=settings.storage.curated_format)
         model = mlflow.spark.load_model(args.model_uri)

@@ -10,23 +10,35 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> int:
-    model_uri = os.getenv("MODEL_URI", "models:/aq_pm25_forecast_h1/Production")
+    model_uri = os.getenv("MODEL_URI", "models:/aq_pm25_forecast_h1/latest")
     horizon = os.getenv("HORIZON", "1")
+    bootstrap_servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    topics = os.getenv("KAFKA_TOPICS", "weather.raw.stream,air_quality.raw.stream")
+    starting_offsets = os.getenv("STARTING_OFFSETS", "latest")
     alert_threshold = os.getenv("ALERT_THRESHOLD", "0.5")
 
     cmd = [
         sys.executable,
         "-m",
-        "air_quality_ml.inference.batch_score",
+        "air_quality_ml.inference.stream_score",
         "--base-config",
         str(ROOT / "configs" / "base.yaml"),
         "--model-uri",
         model_uri,
         "--horizon",
         str(horizon),
+        "--bootstrap-servers",
+        bootstrap_servers,
+        "--topics",
+        topics,
+        "--starting-offsets",
+        starting_offsets,
         "--alert-threshold",
         str(alert_threshold),
     ]
+
+    if os.getenv("STREAM_ONCE", "0").lower() in {"1", "true", "yes"}:
+        cmd.append("--once")
 
     mongo_uri = os.getenv("MONGO_URI")
     mongo_db = os.getenv("MONGO_DB", "air_quality")

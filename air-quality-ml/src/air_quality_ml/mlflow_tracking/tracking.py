@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import os
 from typing import Iterator
 
 import mlflow
@@ -9,9 +10,11 @@ from air_quality_ml.settings import BaseSettings, JobConfig
 
 
 def configure_mlflow(settings: BaseSettings) -> None:
-    mlflow.set_tracking_uri(settings.mlflow.tracking_uri)
-    if settings.mlflow.registry_uri:
-        mlflow.set_registry_uri(settings.mlflow.registry_uri)
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI") or settings.mlflow.tracking_uri
+    registry_uri = os.getenv("MLFLOW_REGISTRY_URI") or settings.mlflow.registry_uri
+    mlflow.set_tracking_uri(tracking_uri)
+    if registry_uri:
+        mlflow.set_registry_uri(registry_uri)
 
 
 def set_experiment(job: JobConfig, settings: BaseSettings) -> str:

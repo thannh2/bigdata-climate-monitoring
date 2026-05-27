@@ -19,7 +19,7 @@ data:
   contract_reports_path: ../../Data/gold/data_contract
 
 mlflow:
-  tracking_uri: http://localhost:5000
+  tracking_uri: http://host.docker.internal:5000
   experiment_root: air-quality
   registry_uri: null
 
@@ -29,10 +29,10 @@ features:
   high_pollution_threshold: 75.0
 
 storage:
-  curated_format: delta
-  predictions_format: delta
-  eval_format: delta
-  monitoring_format: delta
+  curated_format: parquet
+  predictions_format: parquet
+  eval_format: parquet
+  monitoring_format: parquet
 
 data_contract:
   enabled: true

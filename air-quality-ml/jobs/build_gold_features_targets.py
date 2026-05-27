@@ -12,7 +12,7 @@ def main() -> int:
     cmd = [
         sys.executable,
         "-m",
-        "air_quality_ml.processing.pipeline_job",
+        "src.air_quality_ml.processing.pipeline_job",
         "--base-config",
         str(ROOT / "configs" / "base.yaml"),
     ]

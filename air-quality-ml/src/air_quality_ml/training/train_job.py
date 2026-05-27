@@ -6,6 +6,7 @@ from pathlib import Path
 
 import mlflow
 import mlflow.spark
+from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, StructType
 
 from air_quality_ml.features.feature_catalog import get_default_feature_columns
 from air_quality_ml.mlflow_tracking.artifacts import log_feature_importance, log_json_artifact
@@ -106,8 +107,24 @@ def _write_eval_snapshot(
     dataset_version: str | None,
     eval_path: str,
 ) -> None:
+    schema = StructType(
+        [
+            StructField("recorded_at", StringType(), nullable=False),
+            StructField("run_id", StringType(), nullable=False),
+            StructField("task", StringType(), nullable=False),
+            StructField("model_name", StringType(), nullable=False),
+            StructField("horizon", IntegerType(), nullable=False),
+            StructField("split", StringType(), nullable=False),
+            StructField("metric_name", StringType(), nullable=False),
+            StructField("metric_value", DoubleType(), nullable=False),
+            StructField("data_path", StringType(), nullable=False),
+            StructField("data_format", StringType(), nullable=False),
+            StructField("dataset_version", StringType(), nullable=False),
+        ]
+    )
     rows: list[dict[str, str | float | int | None]] = []
     recorded_at = datetime.now(timezone.utc).isoformat()
+    dataset_version_value = dataset_version or "unknown"
     for split_name, metrics in [("val", val_metrics), ("test", test_metrics)]:
         for metric_name, metric_value in metrics.items():
             rows.append(
@@ -122,14 +139,14 @@ def _write_eval_snapshot(
                     "metric_value": float(metric_value),
                     "data_path": data_path,
                     "data_format": data_format,
-                    "dataset_version": dataset_version,
+                    "dataset_version": dataset_version_value,
                 }
             )
 
     if not rows:
         return
 
-    eval_df = spark.createDataFrame(rows)
+    eval_df = spark.createDataFrame(rows, schema=schema)
     write_dataset_safe(
         eval_df,
         eval_path,

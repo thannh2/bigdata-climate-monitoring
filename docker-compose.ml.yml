@@ -1,12 +1,55 @@
 services:
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  mlflow:
+    build:
+      context: ./air-quality-ml
+      dockerfile: Dockerfile
+    image: air-quality-ml:local
+    working_dir: /workspace/air-quality-ml
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - /workspace/air-quality-ml/mlruns
+      - --default-artifact-root
+      - file:///workspace/air-quality-ml/mlartifacts
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "5001:5000"
+    volumes:
+      - ./air-quality-ml:/workspace/air-quality-ml
+
   air-quality-ml:
     build:
       context: ./air-quality-ml
       dockerfile: Dockerfile
     image: air-quality-ml:local
     working_dir: /workspace/air-quality-ml
+    depends_on:
+      mlflow:
+        condition: service_healthy
     environment:
-      MLFLOW_TRACKING_URI: http://host.docker.internal:5000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB: air_quality
+      MONGO_COLLECTION: realtime_predictions
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPARK_EXTRA_PACKAGES: org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1
       PYARROW_IGNORE_TIMEZONE: "1"
       PYSPARK_PYTHON: python
       PYSPARK_DRIVER_PYTHON: python
@@ -16,4 +59,42 @@ services:
     volumes:
       - ./air-quality-ml:/workspace/air-quality-ml
       - ./Data:/workspace/Data
+    networks:
+      - default
+      - kafka_network
     command: ["python", "jobs/build_gold_features_targets.py"]
+
+  dashboard:
+    build:
+      context: ./air-quality-ml
+      dockerfile: Dockerfile
+    image: air-quality-ml:local
+    working_dir: /workspace/air-quality-ml
+    depends_on:
+      - mongodb
+    environment:
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB: air_quality
+      MONGO_COLLECTION: realtime_predictions
+      HISTORICAL_PREDICTIONS_PATH: /workspace/Data/gold/predictions
+      STREAM_PREDICTIONS_PATH: /workspace/Data/gold/predictions_stream
+      MONITORING_PATH: /workspace/Data/gold/monitoring
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./air-quality-ml:/workspace/air-quality-ml
+      - ./Data:/workspace/Data
+    command:
+      - streamlit
+      - run
+      - dashboard/app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+
+networks:
+  kafka_network:
+    external: true
+    name: ingestion_kafka_network
+
+volumes:
+  mongo_data:

@@ -43,6 +43,9 @@ def create_spark_session(settings: BaseSettings) -> SparkSession:
         .config("spark.sql.session.timeZone", settings.spark.session_timezone)
         .config("spark.sql.shuffle.partitions", str(settings.spark.shuffle_partitions))
     )
+    extra_packages = os.getenv("SPARK_EXTRA_PACKAGES")
+    if extra_packages:
+        builder = builder.config("spark.jars.packages", extra_packages)
 
     if _delta_enabled(settings):
         builder = (

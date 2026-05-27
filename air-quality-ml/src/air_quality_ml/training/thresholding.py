@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from pyspark.ml.functions import vector_to_array
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
 
 def with_probability_score(df: DataFrame, probability_col: str = "probability", score_col: str = "pred_prob") -> DataFrame:
-    return df.withColumn(score_col, F.col(probability_col).getItem(1).cast("double"))
+    return df.withColumn(score_col, vector_to_array(F.col(probability_col)).getItem(1).cast("double"))
 
 
 def tune_binary_threshold(

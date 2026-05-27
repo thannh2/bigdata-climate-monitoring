@@ -11,17 +11,20 @@ from pyspark.sql import DataFrame
 def _set_supported_params(model: Any, params: dict[str, Any]) -> Any:
     for k, v in params.items():
         if model.hasParam(k):
-            model = model.set(model.getParam(k), v)
+            model.set(model.getParam(k), v)
     return model
 
 
 def _build_regressor(model_type: str, label_col: str, prediction_col: str, params: dict[str, Any]) -> Any:
-    if model_type == "linear":
+    normalized_model_type = model_type.strip().lower()
+    if normalized_model_type in {"linear", "lr"}:
         model = LinearRegression(labelCol=label_col, featuresCol="features", predictionCol=prediction_col)
-    elif model_type == "rf":
+    elif normalized_model_type in {"rf", "random_forest", "randomforest"}:
         model = RandomForestRegressor(labelCol=label_col, featuresCol="features", predictionCol=prediction_col)
-    else:
+    elif normalized_model_type in {"gbt", "gbtree", "gradient_boosted_trees"}:
         model = GBTRegressor(labelCol=label_col, featuresCol="features", predictionCol=prediction_col)
+    else:
+        raise ValueError(f"Unsupported regression model_type: {model_type}")
 
     return _set_supported_params(model, params)
 

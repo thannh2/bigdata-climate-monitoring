@@ -12,7 +12,7 @@ from pyspark.sql import functions as F
 def _set_supported_params(model: Any, params: dict[str, Any]) -> Any:
     for k, v in params.items():
         if model.hasParam(k):
-            model = model.set(model.getParam(k), v)
+            model.set(model.getParam(k), v)
     return model
 
 
@@ -27,8 +27,11 @@ def add_class_weight_col(df: DataFrame, label_col: str, weight_col: str = "class
 
     expr = None
     for label_value, weight in label_to_weight.items():
-        cond = F.when(F.col(label_col).cast("double") == F.lit(label_value), F.lit(float(weight)))
-        expr = cond if expr is None else expr.otherwise(cond)
+        condition = F.col(label_col).cast("double") == F.lit(label_value)
+        if expr is None:
+            expr = F.when(condition, F.lit(float(weight)))
+        else:
+            expr = expr.when(condition, F.lit(float(weight)))
 
     if expr is None:
         return df.withColumn(weight_col, F.lit(1.0))
@@ -44,30 +47,33 @@ def _build_classifier(
     weight_col: str,
     params: dict[str, Any],
 ) -> Any:
-    if model_type == "logistic":
+    normalized_model_type = model_type.strip().lower()
+    if normalized_model_type in {"logistic", "lr"}:
         model = LogisticRegression(
             labelCol=label_col,
             featuresCol="features",
             predictionCol=prediction_col,
-            probabilityCol=probability_col,
             weightCol=weight_col,
         )
-    elif model_type == "rf":
+    elif normalized_model_type in {"rf", "random_forest", "randomforest"}:
         model = RandomForestClassifier(
             labelCol=label_col,
             featuresCol="features",
             predictionCol=prediction_col,
-            probabilityCol=probability_col,
             weightCol=weight_col,
         )
-    else:
+    elif normalized_model_type in {"gbt", "gbtree", "gradient_boosted_trees"}:
         model = GBTClassifier(
             labelCol=label_col,
             featuresCol="features",
             predictionCol=prediction_col,
-            probabilityCol=probability_col,
             weightCol=weight_col,
         )
+    else:
+        raise ValueError(f"Unsupported classification model_type: {model_type}")
+
+    if model.hasParam("probabilityCol"):
+        model.set(model.getParam("probabilityCol"), probability_col)
 
     return _set_supported_params(model, params)
 

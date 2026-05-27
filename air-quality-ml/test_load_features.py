@@ -8,12 +8,12 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from air_quality_ml.processing.load_features import (
+from src.air_quality_ml.processing.load_features import (
     add_alert_target_from_pm25,
     load_and_prepare_features,
 )
-from air_quality_ml.settings import load_base_settings, resolve_path
-from air_quality_ml.utils.spark import create_spark_session
+from src.air_quality_ml.settings import load_base_settings, resolve_path
+from src.air_quality_ml.utils.spark import create_spark_session
 
 
 def main():

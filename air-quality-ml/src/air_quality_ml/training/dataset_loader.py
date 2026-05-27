@@ -22,9 +22,9 @@ def prepare_training_frame(df: DataFrame, target_col: str, dropna_label: bool = 
     if target_col not in df.columns:
         raise ValueError(f"Target column not found: {target_col}")
 
-    out = df
+    out = df.withColumn(target_col, F.col(target_col).cast("double"))
     if dropna_label:
-        out = out.filter(F.col(target_col).isNotNull())
+        out = out.filter(F.col(target_col).isNotNull() & ~F.isnan(F.col(target_col)))
 
     # Sử dụng timestamp thay vì event_hour
     out = out.filter(F.col("timestamp").isNotNull())

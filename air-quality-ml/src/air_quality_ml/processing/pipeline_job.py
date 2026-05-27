@@ -28,7 +28,7 @@ def _partition_columns(columns: list[str]) -> list[str]:
 
 def main() -> None:
     args = parse_args()
-    logger = get_logger("air_quality_ml.processing.pipeline_job")
+    logger = get_logger("src.air_quality_ml.processing.pipeline_job")
 
     base_config_path = Path(args.base_config).resolve()
     settings = load_base_settings(base_config_path)
