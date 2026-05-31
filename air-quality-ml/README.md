@@ -12,20 +12,13 @@ Dự báo nồng độ PM2.5 và phát cảnh báo ô nhiễm không khí cho c�
 air-quality-ml/
 ├── configs/                    # Cấu hình YAML
 │   ├── base.yaml              # Config chung (paths, spark, mlflow, split)
-│   ├── training_pm25_h*.yaml  # Config training PM2.5 regression
-│   ├── alert_h*.yaml          # Config training Alert classification
 │   ├── feature_store.yaml     # Danh sách features
-│   └── monitoring_thresholds.yaml
+│   ├── monitoring_thresholds.yaml
+│   └── generated/l4/          # Config training sinh tự động (regression + alert)
 │
 ├── jobs/                       # Entry point scripts
-│   ├── train_pm25_h1.py       # Train PM2.5 forecast 1h
-│   ├── train_pm25_h6.py       # Train PM2.5 forecast 6h
-│   ├── train_pm25_h12.py      # Train PM2.5 forecast 12h
-│   ├── train_pm25_h24.py      # Train PM2.5 forecast 24h
-│   ├── train_alert_h1.py      # Train Alert classifier 1h
-│   ├── train_alert_h6.py      # Train Alert classifier 6h
-│   ├── train_alert_h12.py     # Train Alert classifier 12h
-│   ├── train_alert_h24.py     # Train Alert classifier 24h
+│   ├── generate_l4_training_configs.py  # Sinh config cho mọi target × horizon
+│   ├── train_all.py           # Train toàn bộ config đã sinh (có --filter)
 │   ├── batch_score_latest.py  # Batch scoring
 │   ├── monitor_daily.py       # Daily monitoring
 │   └── build_gold_features_targets.py  # Build curated ML dataset
@@ -156,7 +149,7 @@ Pipeline hien tai van lay du lieu dau vao tu `Data/`, sau do materialize sang cu
 **L1 - Engineered (9):** coord_X/Y/Z, wind_U/V, hour_sin/cos, ...  
 **L2 - Domain (3):** theta_e, is_stagnant_air, cooling_degree_days  
 **L3 - Time-series (5+):** pressure_delta_3h, temp_mean_6h, pm25_acc_12h, ...  
-**L4 - Targets (20+):** target_pm25_[1,6,12,24]h, target_temp_*, ...
+**L4 - Targets:** 6 regression target (temp, pm25, cloud_cover, precipitation, wind_speed, pressure) + alert classifier, cho 12 horizon [1,2,3,4,5,6,9,12,15,18,21,24]. Tất cả target được regenerate bằng `lead()`.
 
 Chi tiết: [docs/feature_catalog.md](docs/feature_catalog.md)
 
@@ -173,20 +166,17 @@ test:  2025-07-01 → 2026-04-15  (~9 months)
 ### Chạy training
 
 ```bash
-# Materialize curated dataset truoc khi train
+# 1. Materialize curated dataset truoc khi train
 python jobs/build_gold_features_targets.py
 
-# PM2.5 Regression
-python jobs/train_pm25_h1.py   # 1 hour ahead
-python jobs/train_pm25_h6.py   # 6 hours ahead
-python jobs/train_pm25_h12.py  # 12 hours ahead
-python jobs/train_pm25_h24.py  # 24 hours ahead
+# 2. Sinh training configs cho moi target x horizon (regression + alert)
+python jobs/generate_l4_training_configs.py --overwrite
 
-# Alert Classification
-python jobs/train_alert_h1.py  # 1 hour ahead
-python jobs/train_alert_h6.py  # 6 hours ahead
-python jobs/train_alert_h12.py # 12 hours ahead
-python jobs/train_alert_h24.py # 24 hours ahead
+# 3. Train toan bo, hoac loc theo ten config
+python jobs/train_all.py                 # tat ca
+python jobs/train_all.py --filter pm25   # chi PM2.5
+python jobs/train_all.py --filter alert  # chi alert classifier
+python jobs/train_all.py --filter h24    # chi horizon 24h
 ```
 
 ### Xem kết quả trong MLflow
@@ -246,19 +236,25 @@ split:
   val_end: "2025-06-30 23:00:00"
 
 features:
-  horizons: [1, 6, 12, 24]
+  horizons: [1, 2, 3, 4, 5, 6, 9, 12, 15, 18, 21, 24]
   alert_pm25_threshold: 35.0
 ```
 
-### Training Config (`configs/training_pm25_h1.yaml`)
+### Training Config (`configs/generated/l4/pm25_h1.yaml`)
+
+Các file này được sinh tự động bởi `jobs/generate_l4_training_configs.py`:
 
 ```yaml
-model:
-  type: regression
-  algorithm: gbt
-  target_col: target_pm25_1h
-  max_iter: 100
-  max_depth: 5
+task: regression
+horizon: 1
+target_col: target_pm25_1h
+model_type: gbt
+model_name: aq_pm25_forecast_h1
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
 ```
 
 ## 🧪 Testing
@@ -273,8 +269,9 @@ python jobs/build_gold_features_targets.py
 # Run unit tests
 pytest tests/
 
-# Test training
-python jobs/train_pm25_h1.py
+# Test training (sinh config truoc, roi train PM2.5)
+python jobs/generate_l4_training_configs.py --overwrite
+python jobs/train_all.py --filter pm25_h1
 ```
 
 ## 📚 Documentation
@@ -334,8 +331,9 @@ Xem `.gitignore` để biết chi tiết.
 
 | Script | Mục đích |
 |--------|----------|
-| `jobs/train_pm25_h1.py` | Train PM2.5 forecast 1h |
-| `jobs/train_alert_h1.py` | Train Alert classifier 1h |
+| `jobs/build_gold_features_targets.py` | Build curated ML dataset |
+| `jobs/generate_l4_training_configs.py` | Sinh training configs (target × horizon) |
+| `jobs/train_all.py` | Train toàn bộ config đã sinh |
 | `jobs/batch_score_latest.py` | Batch scoring |
 | `jobs/monitor_daily.py` | Daily monitoring |
 | `test_load_features.py` | Test load features |

@@ -7,6 +7,7 @@ from pyspark.sql import DataFrame
 BASE_NUMERIC_FEATURES = [
     "latitude",
     "longitude",
+    "elevation",
     "temp_c",
     "humidity",
     "pressure",
@@ -31,6 +32,7 @@ L1_FEATURES = [
     "dew_point",
     "hour_sin",
     "hour_cos",
+    "day_sin",
 ]
 
 # L2 - Domain-specific features
@@ -68,7 +70,6 @@ def get_default_feature_columns(df: DataFrame, target_col: str) -> tuple[list[st
         "year",
         "month",
         "hour",
-        "elevation",
     }
     
     # Loại bỏ tất cả target columns

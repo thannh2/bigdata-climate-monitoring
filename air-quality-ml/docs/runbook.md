@@ -38,16 +38,29 @@ Job nay se:
 - ghi curated dataset theo format cau hinh (`delta` mac dinh)
 
 ## 4) Train
-```bash
-python jobs/train_pm25_h1.py
-python jobs/train_pm25_h6.py
-python jobs/train_pm25_h12.py
-python jobs/train_pm25_h24.py
 
-python jobs/train_alert_h1.py
-python jobs/train_alert_h6.py
-python jobs/train_alert_h12.py
-python jobs/train_alert_h24.py
+### Buoc 4.1: Sinh training configs (1 lan, hoac khi doi target/horizon)
+```bash
+python jobs/generate_l4_training_configs.py --overwrite
+```
+Sinh config cho 6 L4 regression target (temp, pm25, cloud_cover, precipitation,
+wind_speed, pressure) x 12 horizon + alert classifier 12 horizon, vao
+`configs/generated/l4/`.
+
+### Buoc 4.2: Train
+```bash
+# Train tat ca configs
+python jobs/train_all.py
+
+# Hoac loc theo ten config
+python jobs/train_all.py --filter pm25     # chi PM2.5
+python jobs/train_all.py --filter alert    # chi alert classifier
+python jobs/train_all.py --filter h24      # chi horizon 24h
+
+# Hoac train 1 config rieng le
+python -m air_quality_ml.training.train_job \
+  --base-config configs/base.yaml \
+  --job-config configs/generated/l4/pm25_h1.yaml
 ```
 
 ## 5) Batch score

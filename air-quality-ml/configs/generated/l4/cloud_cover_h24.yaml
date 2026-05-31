@@ -1,0 +1,22 @@
+task: regression
+horizon: 24
+target_col: target_cloud_cover_24h
+target_name: cloud_cover
+prediction_unit: percent
+output_kind: regression
+prediction_col: prediction
+model_type: gbt
+model_name: aq_cloud_cover_h24
+experiment_name: air-quality/l4/cloud_cover/h24
+training:
+  label_col: target_cloud_cover_24h
+  max_rows: null
+  dropna_label: true
+params:
+  maxDepth: 8
+  maxIter: 120
+  stepSize: 0.05
+  subsamplingRate: 0.85
+model_selection:
+  metric: mae
+register_if_pass: true

@@ -44,7 +44,7 @@ class PromotionConfig(BaseModel):
 
 
 class FeatureDefaults(BaseModel):
-    horizons: list[int] = Field(default_factory=lambda: [1, 6, 12, 24])
+    horizons: list[int] = Field(default_factory=lambda: [1, 2, 3, 4, 5, 6, 9, 12, 15, 18, 21, 24])
     alert_pm25_threshold: float = 35.0
     high_pollution_threshold: float = 75.0
 
@@ -97,6 +97,9 @@ class JobConfig(BaseModel):
     task: str
     horizon: int
     target_col: str
+    target_name: Optional[str] = None
+    prediction_unit: Optional[str] = None
+    output_kind: Optional[str] = None
     prediction_col: str = "prediction"
     probability_col: Optional[str] = "probability"
     model_type: str
@@ -105,6 +108,7 @@ class JobConfig(BaseModel):
     training: Dict[str, Any] = Field(default_factory=dict)
     params: Dict[str, Any] = Field(default_factory=dict)
     threshold_tuning: Dict[str, Any] = Field(default_factory=dict)
+    model_selection: Dict[str, Any] = Field(default_factory=dict)
     register_if_pass: bool = True
 
 

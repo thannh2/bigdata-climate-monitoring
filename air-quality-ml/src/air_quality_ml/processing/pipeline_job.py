@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pyspark.sql import DataFrame, Window
+from pyspark.sql import functions as F
+
 from air_quality_ml.data_contract.validators import validate_feature_contract
+from air_quality_ml.features.l4_targets import L4_TARGET_SPECS, iter_l4_target_columns
 from air_quality_ml.processing.load_features import (
     add_alert_target_from_pm25,
     load_and_prepare_features,
@@ -26,6 +31,52 @@ def _partition_columns(columns: list[str]) -> list[str]:
     return [column for column in ["year", "month"] if column in columns]
 
 
+def _ensure_time_features(df: DataFrame) -> DataFrame:
+    if "timestamp" not in df.columns:
+        return df
+    if "day_of_year" not in df.columns:
+        df = df.withColumn("day_of_year", F.dayofyear("timestamp"))
+    if "day_sin" not in df.columns:
+        df = df.withColumn("day_sin", F.sin(2 * math.pi * F.col("day_of_year") / 366))
+    return df
+
+
+def _add_l4_targets(df: DataFrame) -> DataFrame:
+    """Regenerate moi L4 target bang lead(source_col, horizon) de dam bao nhat quan.
+
+    Ghi de ca cac target da duoc tien tinh trong nguon (1h/6h/12h/24h) thay vi
+    giu nguyen, tranh provenance hon hop giua gia tri nguon va gia tri lead().
+    """
+    if "station_id" not in df.columns or "timestamp" not in df.columns:
+        return df
+
+    window_spec = Window.partitionBy("station_id").orderBy("timestamp")
+    for spec in L4_TARGET_SPECS:
+        if spec.source_col not in df.columns:
+            continue
+        for horizon in spec.horizons:
+            target_col = spec.column_for_horizon(horizon)
+            df = df.withColumn(target_col, F.lead(spec.source_col, horizon).over(window_spec))
+
+    return df
+
+
+def _drop_unused_targets(df: DataFrame, allowed_targets: set[str]) -> DataFrame:
+    """Loai bo moi cot target_* khong nam trong tap cho phep.
+
+    Cac target 'do' (rain_start, storm_prob, inversion, solar_rad, hvac_load,
+    wind_U, wind_V) da co san trong parquet nguon se bi drop o day.
+    """
+    to_drop = [
+        column
+        for column in df.columns
+        if column.startswith("target_") and column not in allowed_targets
+    ]
+    if to_drop:
+        df = df.drop(*to_drop)
+    return df
+
+
 def main() -> None:
     args = parse_args()
     logger = get_logger("air_quality_ml.processing.pipeline_job")
@@ -41,6 +92,8 @@ def main() -> None:
     spark = create_spark_session(settings)
     try:
         df = load_and_prepare_features(spark, features_path)
+        df = _ensure_time_features(df)
+        df = _add_l4_targets(df)
 
         for h in settings.features.horizons:
             pm25_col = f"target_pm25_{h}h"
@@ -52,6 +105,11 @@ def main() -> None:
                     alert_col,
                     threshold=settings.features.alert_pm25_threshold,
                 )
+
+        allowed_targets = set(iter_l4_target_columns()) | {
+            f"target_alert_{h}h" for h in settings.features.horizons
+        }
+        df = _drop_unused_targets(df, allowed_targets)
 
         contract_report = {"status": "skipped", "reason": "disabled"}
         if settings.data_contract.enabled:

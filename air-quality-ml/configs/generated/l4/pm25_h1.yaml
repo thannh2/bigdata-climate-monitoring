@@ -1,0 +1,22 @@
+task: regression
+horizon: 1
+target_col: target_pm25_1h
+target_name: pm25
+prediction_unit: ug_m3
+output_kind: regression
+prediction_col: prediction
+model_type: gbt
+model_name: aq_pm25_h1
+experiment_name: air-quality/l4/pm25/h1
+training:
+  label_col: target_pm25_1h
+  max_rows: null
+  dropna_label: true
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
+model_selection:
+  metric: mae
+register_if_pass: true

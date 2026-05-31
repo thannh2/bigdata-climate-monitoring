@@ -1,0 +1,22 @@
+task: regression
+horizon: 5
+target_col: target_precipitation_5h
+target_name: precipitation
+prediction_unit: mm
+output_kind: regression
+prediction_col: prediction
+model_type: gbt
+model_name: aq_precipitation_h5
+experiment_name: air-quality/l4/precipitation/h5
+training:
+  label_col: target_precipitation_5h
+  max_rows: null
+  dropna_label: true
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
+model_selection:
+  metric: mae
+register_if_pass: true

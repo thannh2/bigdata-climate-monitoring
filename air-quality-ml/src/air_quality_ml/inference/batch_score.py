@@ -8,6 +8,7 @@ import mlflow
 import mlflow.spark
 from pyspark.sql import functions as F
 
+from air_quality_ml.features.l4_targets import infer_target_col_from_model_name, target_metadata
 from air_quality_ml.inference.postprocess_alerts import add_alert_level, add_binary_alert
 from air_quality_ml.inference.writer_mongodb import write_predictions_to_mongo
 from air_quality_ml.settings import load_base_settings, resolve_path
@@ -24,11 +25,40 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-path", required=False, default=None, help="Input feature table path")
     parser.add_argument("--output-path", required=False, default=None, help="Output prediction path")
     parser.add_argument("--horizon", required=True, type=int, help="Prediction horizon in hours")
+    parser.add_argument("--target-col", required=False, default=None, help="L4 target column this model predicts")
+    parser.add_argument("--target-name", required=False, default=None, help="Human-readable L4 target name")
+    parser.add_argument("--prediction-unit", required=False, default=None, help="Prediction unit, e.g. ug_m3 or celsius")
+    parser.add_argument("--output-kind", required=False, default=None, help="regression/classification/binary/probability")
     parser.add_argument("--alert-threshold", required=False, type=float, default=0.5)
     parser.add_argument("--mongo-uri", required=False, default=None)
     parser.add_argument("--mongo-db", required=False, default="air_quality")
     parser.add_argument("--mongo-collection", required=False, default="realtime_predictions")
     return parser.parse_args()
+
+
+def _model_name_from_uri(model_uri: str) -> str:
+    if model_uri.startswith("models:/"):
+        return model_uri.removeprefix("models:/").split("/")[0]
+    if "/" in model_uri:
+        return model_uri.split("/")[1]
+    return model_uri
+
+
+def _infer_target_col(model_uri: str, horizon: int) -> str:
+    model_name = _model_name_from_uri(model_uri)
+    return infer_target_col_from_model_name(model_name, horizon)
+
+
+def _prediction_metadata(args: argparse.Namespace) -> dict[str, str]:
+    target_col = args.target_col or _infer_target_col(args.model_uri, int(args.horizon))
+    metadata = target_metadata(target_col, fallback_task=args.output_kind)
+    if args.target_name:
+        metadata["target_name"] = args.target_name
+    if args.prediction_unit:
+        metadata["prediction_unit"] = args.prediction_unit
+    if args.output_kind:
+        metadata["target_family"] = args.output_kind
+    return metadata
 
 
 def main() -> None:
@@ -51,11 +81,16 @@ def main() -> None:
         model = mlflow.spark.load_model(args.model_uri)
 
         batch_id = str(uuid4())
+        metadata = _prediction_metadata(args)
         pred_df = model.transform(features_df)
         pred_df = pred_df.withColumn("horizon", F.lit(int(args.horizon)))
+        pred_df = pred_df.withColumn("target_name", F.lit(metadata["target_name"]))
+        pred_df = pred_df.withColumn("target_col", F.lit(metadata["target_col"]))
+        pred_df = pred_df.withColumn("target_family", F.lit(metadata["target_family"]))
+        pred_df = pred_df.withColumn("prediction_unit", F.lit(metadata["prediction_unit"]))
         pred_df = pred_df.withColumn("prediction_time", F.current_timestamp())
         pred_df = pred_df.withColumn("prediction_date", F.to_date("prediction_time"))
-        pred_df = pred_df.withColumn("model_name", F.lit(args.model_uri.split("/")[1] if "/" in args.model_uri else args.model_uri))
+        pred_df = pred_df.withColumn("model_name", F.lit(_model_name_from_uri(args.model_uri)))
         pred_df = pred_df.withColumn("model_version", F.lit(args.model_uri))
         pred_df = pred_df.withColumn("batch_id", F.lit(batch_id))
 
@@ -91,6 +126,10 @@ def main() -> None:
                             "timestamp",
                             "prediction_time",
                             "horizon",
+                            "target_name",
+                            "target_col",
+                            "target_family",
+                            "prediction_unit",
                             "model_name",
                             "model_version",
                             "batch_id",

@@ -1,0 +1,22 @@
+task: regression
+horizon: 21
+target_col: target_wind_speed_21h
+target_name: wind_speed
+prediction_unit: m_s
+output_kind: regression
+prediction_col: prediction
+model_type: gbt
+model_name: aq_wind_speed_h21
+experiment_name: air-quality/l4/wind_speed/h21
+training:
+  label_col: target_wind_speed_21h
+  max_rows: null
+  dropna_label: true
+params:
+  maxDepth: 8
+  maxIter: 120
+  stepSize: 0.05
+  subsamplingRate: 0.85
+model_selection:
+  metric: mae
+register_if_pass: true

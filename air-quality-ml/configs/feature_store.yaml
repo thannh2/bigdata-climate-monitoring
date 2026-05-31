@@ -4,6 +4,7 @@
 numeric_features:
   - latitude
   - longitude
+  - elevation
   - temp_c
   - humidity
   - pressure
@@ -31,6 +32,7 @@ l1_features:
   - dew_point
   - hour_sin
   - hour_cos
+  - day_sin
 
 # L2 - Domain-specific features
 l2_features:

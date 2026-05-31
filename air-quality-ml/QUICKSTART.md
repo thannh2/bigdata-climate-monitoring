@@ -44,8 +44,11 @@ AVAILABLE TARGETS:
 # Build curated ML dataset từ Data/ trước
 python jobs/build_gold_features_targets.py
 
+# Sinh training configs (target × horizon)
+python jobs/generate_l4_training_configs.py --overwrite
+
 # Train PM2.5 forecast cho horizon 1h
-python jobs/train_pm25_h1.py
+python jobs/train_all.py --filter pm25_h1
 ```
 
 Output mong đợi:
@@ -73,16 +76,10 @@ Mở browser: http://localhost:5000
 ### Bước 5: Training thêm models
 
 ```bash
-# PM2.5 forecast cho các horizons khác
-python jobs/train_pm25_h6.py
-python jobs/train_pm25_h12.py
-python jobs/train_pm25_h24.py
-
-# Alert classifier
-python jobs/train_alert_h1.py
-python jobs/train_alert_h6.py
-python jobs/train_alert_h12.py
-python jobs/train_alert_h24.py
+# Train tất cả horizons + targets còn lại
+python jobs/train_all.py --filter pm25    # PM2.5 mọi horizon
+python jobs/train_all.py --filter alert   # Alert classifier mọi horizon
+python jobs/train_all.py                  # toàn bộ target
 ```
 
 ## 📊 Hiểu về dữ liệu

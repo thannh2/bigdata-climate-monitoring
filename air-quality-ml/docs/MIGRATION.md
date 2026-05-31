@@ -59,14 +59,16 @@ Dữ liệu đã transform có đầy đủ:
 - temp_mean_6h
 - pm25_acc_12h
 
-**L4 (Targets)**:
-- target_pm25_[1,6,12,24]h
-- target_temp_[1,6,12,24]h
-- target_inversion_[1,6,12,24]h
-- target_solar_rad_[1,6,12,24]h
-- target_hvac_load_[1,6,12,24]h
-- target_rain_start_[1,6]h
-- target_storm_prob_[12,24]h
+**L4 (Targets)** — chỉ giữ regression target (green), regenerate bằng `lead()`:
+- target_pm25_[1,2,3,4,5,6,9,12,15,18,21,24]h
+- target_temp_[...]h
+- target_cloud_cover_[...]h
+- target_precipitation_[...]h
+- target_wind_speed_[...]h
+- target_pressure_[...]h
+- target_alert_[...]h (classifier, sinh từ target_pm25)
+
+Đã bỏ: target_inversion, target_solar_rad, target_hvac_load, target_rain_start, target_storm_prob, target_wind_U, target_wind_V.
 
 ### 5. Cấu hình mới
 
@@ -111,17 +113,13 @@ df = add_alert_target_from_pm25(
 
 ### 7. Horizons hỗ trợ
 
-Dữ liệu transform có targets cho horizons: **1h, 6h, 12h, 24h**
+Targets được regenerate bằng `lead()` cho các horizon: **1, 2, 3, 4, 5, 6, 9, 12, 15, 18, 21, 24**
 
 Config mặc định trong `base.yaml`:
 ```yaml
 features:
-  horizons: [1, 3, 6, 12, 24]
+  horizons: [1, 2, 3, 4, 5, 6, 9, 12, 15, 18, 21, 24]
 ```
-
-**Lưu ý**: Horizon 3h không có trong dữ liệu transform, cần điều chỉnh:
-- Sử dụng: [1, 6, 12, 24]
-- Hoặc tạo thêm target_pm25_3h bằng interpolation
 
 ### 8. Partition
 
@@ -137,13 +135,12 @@ cd air-quality-ml
 # Kiểm tra dữ liệu
 python jobs/build_gold_features_targets.py --base-config configs/base.yaml
 
-# Training PM2.5 forecast
-python jobs/train_pm25_h1.py
-python jobs/train_pm25_h6.py
+# Sinh training configs
+python jobs/generate_l4_training_configs.py --overwrite
 
-# Training Alert classifier
-python jobs/train_alert_h1.py
-python jobs/train_alert_h6.py
+# Training (regression + alert classifier)
+python jobs/train_all.py --filter pm25
+python jobs/train_all.py --filter alert
 ```
 
 ### 10. Điều chỉnh cần thiết

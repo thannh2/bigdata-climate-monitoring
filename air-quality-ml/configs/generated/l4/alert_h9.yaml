@@ -1,0 +1,27 @@
+task: classification
+horizon: 9
+target_col: target_alert_9h
+target_name: alert
+prediction_unit: binary
+output_kind: classification
+prediction_col: prediction
+probability_col: probability
+model_type: gbt
+model_name: aq_alert_classifier_h9
+experiment_name: air-quality/alert-classifier/h9
+training:
+  label_col: target_alert_9h
+  max_rows: null
+  dropna_label: true
+params:
+  maxDepth: 8
+  maxIter: 120
+  stepSize: 0.05
+threshold_tuning:
+  enabled: true
+  min_precision: 0.35
+  min_recall: 0.8
+  default_threshold: 0.5
+model_selection:
+  metric: auprc
+register_if_pass: true

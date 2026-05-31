@@ -1,0 +1,22 @@
+task: regression
+horizon: 1
+target_col: target_pressure_1h
+target_name: pressure
+prediction_unit: hpa
+output_kind: regression
+prediction_col: prediction
+model_type: gbt
+model_name: aq_pressure_h1
+experiment_name: air-quality/l4/pressure/h1
+training:
+  label_col: target_pressure_1h
+  max_rows: null
+  dropna_label: true
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
+model_selection:
+  metric: mae
+register_if_pass: true

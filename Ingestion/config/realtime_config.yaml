@@ -1,0 +1,225 @@
+# Real-time Hanoi Air Quality Configuration
+# Optimized for low-latency streaming and high throughput
+
+# Collector Configuration
+collector:
+  poll_interval: 30  # seconds - reduced from 300s for real-time
+  max_concurrent: 6  # parallel API calls
+  batch_size: 10
+  timeout: 15  # API timeout in seconds
+  
+  # Circuit breaker settings
+  circuit_breaker:
+    failure_threshold: 5
+    recovery_timeout: 60  # seconds
+  
+  # Hanoi specific stations
+  stations:
+    - id: "hanoi_center"
+      lat: 21.0285
+      lon: 105.8542
+      name: "Hanoi Center"
+      priority: 1
+    - id: "hanoi_cau_giay"
+      lat: 21.0333
+      lon: 105.7969
+      name: "Cau Giay District"
+      priority: 2
+    - id: "hanoi_dong_da"
+      lat: 21.0136
+      lon: 105.8372
+      name: "Dong Da District"
+      priority: 3
+    - id: "hanoi_hai_ba_trung"
+      lat: 21.0058
+      lon: 105.8581
+      name: "Hai Ba Trung District"
+      priority: 4
+
+# Kafka Configuration
+kafka:
+  bootstrap_servers:
+    - "localhost:9092"
+  
+  # Producer settings (optimized for low latency)
+  producer:
+    compression_type: "lz4"
+    linger_ms: 50  # batch for 50ms
+    batch_size: 65536  # 64KB
+    acks: "all"
+    retries: 3
+    max_in_flight_requests_per_connection: 5
+    request_timeout_ms: 30000
+  
+  # Consumer settings
+  consumer:
+    group_id: "hanoi_realtime_processor"
+    auto_offset_reset: "latest"
+    enable_auto_commit: true
+    auto_commit_interval_ms: 1000
+    max_poll_records: 100
+    fetch_min_bytes: 1024
+    fetch_max_wait_ms: 500
+  
+  # Topics configuration
+  topics:
+    weather_realtime: "hanoi_weather_realtime"
+    air_quality_realtime: "hanoi_air_quality_realtime"
+    weather_processed: "hanoi_weather_processed"
+    air_quality_processed: "hanoi_air_quality_processed"
+    alerts: "hanoi_air_quality_alerts"
+    
+    # Topic settings
+    partitions: 3
+    replication_factor: 1  # Single node setup
+    retention_ms: 604800000  # 7 days
+
+# Redis Configuration
+redis:
+  url: "redis://localhost:6379"
+  db: 0
+  
+  # Connection pool settings
+  max_connections: 20
+  retry_on_timeout: true
+  socket_timeout: 5
+  
+  # Cache TTL settings (seconds)
+  ttl:
+    checkpoint: 86400  # 24 hours
+    features: 86400    # 24 hours
+    latest_data: 3600  # 1 hour
+
+# Stream Processing Configuration
+stream_processor:
+  batch_size: 50
+  processing_timeout: 5.0  # seconds
+  
+  # Time windows for aggregations
+  windows:
+    short: 5    # 5 minutes
+    medium: 15  # 15 minutes
+    long: 60    # 60 minutes
+  
+  # Anomaly detection
+  anomaly_detection:
+    window_size: 100  # historical records
+    z_score_threshold: 3.0
+    alert_threshold: 0.8  # anomaly score
+
+# WebSocket Server Configuration
+websocket:
+  host: "0.0.0.0"
+  port: 8765
+  
+  # Connection settings
+  ping_interval: 30
+  ping_timeout: 10
+  max_size: 1048576  # 1MB
+  compression: null  # Disabled for lower latency
+  
+  # Client limits
+  max_clients: 100
+  max_subscriptions_per_client: 10
+
+# API Configuration
+apis:
+  openmeteo:
+    weather_url: "https://api.open-meteo.com/v1/forecast"
+    air_url: "https://air-quality-api.open-meteo.com/v1/air-quality"
+    timeout: 5
+    priority: 1
+    rate_limit: 10000  # requests per day
+  
+  openweathermap:
+    weather_url: "https://api.openweathermap.org/data/2.5/weather"
+    air_url: "https://api.openweathermap.org/data/2.5/air_pollution"
+    timeout: 8
+    priority: 2
+    rate_limit: 1000  # requests per day
+    api_key: "${OPENWEATHERMAP_API_KEY}"
+  
+  iqair:
+    url: "https://api.airvisual.com/v2/nearest_city"
+    timeout: 10
+    priority: 3
+    rate_limit: 10000  # requests per month
+    api_key: "${IQAIR_API_KEY}"
+
+# Performance Targets
+performance:
+  # Latency targets (milliseconds)
+  api_response_time_p95: 2000
+  processing_latency_p95: 100
+  end_to_end_latency_p95: 5000
+  
+  # Throughput targets
+  records_per_minute: 100
+  messages_per_second: 50
+  
+  # Availability targets
+  uptime_sla: 99.5  # percent
+  error_rate_threshold: 1.0  # percent
+
+# Monitoring Configuration
+monitoring:
+  metrics_interval: 60  # seconds
+  
+  # Metrics to track
+  metrics:
+    - "collector.cycle_time"
+    - "collector.api_response_time"
+    - "collector.error_rate"
+    - "kafka.produce_latency"
+    - "kafka.consume_lag"
+    - "processor.processing_time"
+    - "processor.anomaly_rate"
+    - "websocket.connected_clients"
+    - "websocket.messages_sent"
+  
+  # Alerting thresholds
+  alerts:
+    high_error_rate: 5.0  # percent
+    high_latency: 10000   # milliseconds
+    kafka_lag: 1000       # messages
+    low_data_quality: 0.5 # completeness score
+
+# Data Quality Configuration
+data_quality:
+  # Completeness thresholds
+  min_completeness:
+    weather: 0.8    # 80% of fields present
+    air_quality: 0.7  # 70% of fields present
+  
+  # Value ranges for validation
+  ranges:
+    temperature: [-20, 60]     # Celsius
+    humidity: [0, 100]         # Percent
+    pressure: [900, 1100]      # hPa
+    wind_speed: [0, 50]        # m/s
+    pm25: [0, 500]            # μg/m³
+    pm10: [0, 1000]           # μg/m³
+    aqi: [0, 500]             # AQI scale
+  
+  # Outlier detection
+  outlier_detection:
+    method: "z_score"
+    threshold: 3.0
+    window_size: 100
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Log rotation
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  
+  # Component-specific levels
+  loggers:
+    collector: "INFO"
+    processor: "INFO"
+    websocket: "INFO"
+    kafka: "WARNING"
+    redis: "WARNING"

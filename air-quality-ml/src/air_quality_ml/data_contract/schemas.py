@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from air_quality_ml.settings import BaseSettings
+from air_quality_ml.features.l4_targets import iter_l4_target_columns
 
 
 @dataclass
@@ -36,9 +37,7 @@ def build_feature_table_contract(settings: BaseSettings, feature_store_cfg: dict
     l2_features = list(feature_store_cfg.get("l2_features", []))
     l3_features = list(feature_store_cfg.get("l3_features", []))
 
-    target_columns = [f"target_pm25_{h}h" for h in settings.features.horizons] + [
-        f"target_alert_{h}h" for h in settings.features.horizons
-    ]
+    target_columns = iter_l4_target_columns() + [f"target_alert_{h}h" for h in settings.features.horizons]
 
     required_columns = [
         ColumnContract(name="station_id", expected_family="string", nullable=False),
@@ -63,15 +62,6 @@ def build_feature_table_contract(settings: BaseSettings, feature_store_cfg: dict
         if name not in existing_required:
             required_columns.append(ColumnContract(name=name, expected_family="numeric", nullable=True))
             existing_required.add(name)
-
-    for name in target_columns:
-        required_columns.append(
-            ColumnContract(
-                name=name,
-                expected_family="integer" if name.startswith("target_alert_") else "numeric",
-                nullable=True,
-            )
-        )
 
     return FeatureTableContract(
         required_columns=required_columns,
