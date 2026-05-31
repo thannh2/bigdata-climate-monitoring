@@ -20,18 +20,67 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip generating alert classifier configs (target_alert_{h}h)",
     )
+    parser.add_argument(
+        "--full-search",
+        action="store_true",
+        help="Use the larger model_selection space (more candidates, slower). Default is a reduced 2-candidate space.",
+    )
     return parser.parse_args()
 
 
 def _tree_params(horizon: int) -> dict:
+    # Tham so GBT da giam de train nhanh hon (van giu chat luong hop ly).
     return {
-        "maxDepth": 6 if horizon <= 6 else 8,
-        "maxIter": 100 if horizon <= 6 else 120,
-        "stepSize": 0.05,
+        "maxDepth": 5 if horizon <= 6 else 6,
+        "maxIter": 50 if horizon <= 6 else 70,
+        "stepSize": 0.1,
     }
 
 
-def _config_for_target(spec, horizon: int) -> dict:
+def _regression_model_selection(params: dict, full_search: bool) -> dict:
+    if full_search:
+        return {
+            "metric": "mae",
+            "candidates": [
+                {"model_type": "linear", "params": {}},
+                {"model_type": "rf", "params": {"numTrees": 120, "maxDepth": 10, "subsamplingRate": 0.85}},
+                {"model_type": "rf", "params": {"numTrees": 200, "maxDepth": 12, "subsamplingRate": 0.8}},
+                {"model_type": "gbt", "params": {"maxIter": 100, "maxDepth": 5, "stepSize": 0.05, "subsamplingRate": 0.85}},
+                {"model_type": "gbt", "params": {"maxIter": 120, "maxDepth": 8, "stepSize": 0.05, "subsamplingRate": 0.85}},
+            ],
+        }
+    # Reduced: 1 baseline (de promotion so sanh) + 1 GBT chinh.
+    return {
+        "metric": "mae",
+        "candidates": [
+            {"model_type": "linear", "params": {}},
+            {"model_type": "gbt", "params": dict(params)},
+        ],
+    }
+
+
+def _classification_model_selection(params: dict, full_search: bool) -> dict:
+    if full_search:
+        return {
+            "metric": "auprc",
+            "candidates": [
+                {"model_type": "logistic", "params": {"maxIter": 100}},
+                {"model_type": "rf", "params": {"numTrees": 150, "maxDepth": 10}},
+                {"model_type": "gbt", "params": {"maxIter": 100, "maxDepth": 5, "stepSize": 0.05}},
+                {"model_type": "gbt", "params": {"maxIter": 120, "maxDepth": 8, "stepSize": 0.05}},
+            ],
+        }
+    # Reduced: 1 baseline (de promotion so sanh) + 1 GBT chinh.
+    return {
+        "metric": "auprc",
+        "candidates": [
+            {"model_type": "logistic", "params": {"maxIter": 100}},
+            {"model_type": "gbt", "params": dict(params)},
+        ],
+    }
+
+
+def _config_for_target(spec, horizon: int, full_search: bool = False) -> dict:
     target_col = spec.column_for_horizon(horizon)
     params = _tree_params(horizon)
     if spec.task == "regression":
@@ -54,14 +103,12 @@ def _config_for_target(spec, horizon: int) -> dict:
             "dropna_label": True,
         },
         "params": params,
-        "model_selection": {
-            "metric": "mae",
-        },
+        "model_selection": _regression_model_selection(params, full_search),
         "register_if_pass": True,
     }
 
 
-def _config_for_alert(horizon: int) -> dict:
+def _config_for_alert(horizon: int, full_search: bool = False) -> dict:
     target_col = f"target_alert_{horizon}h"
     params = _tree_params(horizon)
     return {
@@ -88,9 +135,7 @@ def _config_for_alert(horizon: int) -> dict:
             "min_recall": 0.80,
             "default_threshold": 0.50,
         },
-        "model_selection": {
-            "metric": "auprc",
-        },
+        "model_selection": _classification_model_selection(params, full_search),
         "register_if_pass": True,
     }
 
@@ -114,7 +159,7 @@ def main() -> int:
     for spec in L4_TARGET_SPECS:
         for horizon in spec.horizons:
             path = output_dir / f"{spec.target_name}_h{horizon}.yaml"
-            if _write_config(path, _config_for_target(spec, horizon), args.overwrite):
+            if _write_config(path, _config_for_target(spec, horizon, args.full_search), args.overwrite):
                 written += 1
             else:
                 skipped += 1
@@ -122,7 +167,7 @@ def main() -> int:
     if not args.no_alert:
         for horizon in HORIZONS:
             path = output_dir / f"alert_h{horizon}.yaml"
-            if _write_config(path, _config_for_alert(horizon), args.overwrite):
+            if _write_config(path, _config_for_alert(horizon, args.full_search), args.overwrite):
                 written += 1
             else:
                 skipped += 1

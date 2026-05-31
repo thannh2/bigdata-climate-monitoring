@@ -14,9 +14,9 @@ training:
   max_rows: null
   dropna_label: true
 params:
-  maxDepth: 8
-  maxIter: 120
-  stepSize: 0.05
+  maxDepth: 6
+  maxIter: 70
+  stepSize: 0.1
 threshold_tuning:
   enabled: true
   min_precision: 0.35
@@ -24,4 +24,13 @@ threshold_tuning:
   default_threshold: 0.5
 model_selection:
   metric: auprc
+  candidates:
+  - model_type: logistic
+    params:
+      maxIter: 100
+  - model_type: gbt
+    params:
+      maxDepth: 6
+      maxIter: 70
+      stepSize: 0.1
 register_if_pass: true

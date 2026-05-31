@@ -13,10 +13,19 @@ training:
   max_rows: null
   dropna_label: true
 params:
-  maxDepth: 8
-  maxIter: 120
-  stepSize: 0.05
+  maxDepth: 6
+  maxIter: 70
+  stepSize: 0.1
   subsamplingRate: 0.85
 model_selection:
   metric: mae
+  candidates:
+  - model_type: linear
+    params: {}
+  - model_type: gbt
+    params:
+      maxDepth: 6
+      maxIter: 70
+      stepSize: 0.1
+      subsamplingRate: 0.85
 register_if_pass: true
