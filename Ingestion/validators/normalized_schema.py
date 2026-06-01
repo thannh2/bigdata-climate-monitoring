@@ -7,6 +7,8 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from utils.locations import OPEN_METEO_LOCATIONS
+
 
 class Region(str, Enum):
     bac = "bac"
@@ -27,7 +29,13 @@ class NormalizedWeatherRecord(BaseModel):
     temperature_c: Optional[float] = None
     humidity: Optional[float] = None
     pressure_hpa: Optional[float] = None
+    surface_pressure_hpa: Optional[float] = None
     wind_speed_mps: Optional[float] = None
+    wind_direction_deg: Optional[float] = None
+    precipitation_mm: Optional[float] = None
+    cloud_cover_pct: Optional[float] = None
+    shortwave_radiation_wm2: Optional[float] = None
+    soil_temperature_0_to_7cm_c: Optional[float] = None
     weather_main: Optional[str] = None
     weather_desc: Optional[str] = None
     data_version: str = "v1"
@@ -54,19 +62,26 @@ class NormalizedAirQualityRecord(BaseModel):
     data_version: str = "v1"
 
 
-REGION_CITY_MAP = {
-    "hanoi": (Region.bac, "Hanoi", 21.0285, 105.8542),
-    "ha noi": (Region.bac, "Hanoi", 21.0285, 105.8542),
-    "hai phong": (Region.bac, "Hai Phong", 20.8449, 106.6881),
-    "quang ninh": (Region.bac, "Quang Ninh", 21.0069, 107.0488),
-    "da nang": (Region.trung, "Da Nang", 16.0544, 108.2022),
-    "hue": (Region.trung, "Hue", 16.4637, 107.5909),
-    "nghe an": (Region.trung, "Nghe An", 19.8167, 105.6667),
-    "hcmc": (Region.nam, "HCMC", 10.7769, 106.6964),
-    "ho chi minh city": (Region.nam, "HCMC", 10.7769, 106.6964),
-    "can tho": (Region.nam, "Can Tho", 10.0379, 105.7869),
-    "dong nai": (Region.nam, "Dong Nai", 10.8231, 106.6297),
-}
+def _infer_region_from_latitude(latitude: float) -> Region:
+    if latitude >= 18:
+        return Region.bac
+    if latitude >= 14:
+        return Region.trung
+    return Region.nam
+
+
+REGION_CITY_MAP: dict[str, tuple[Region, str, float, float]] = {}
+for location in OPEN_METEO_LOCATIONS:
+    canonical_name = str(location["city"])
+    latitude = float(location["latitude"])
+    longitude = float(location["longitude"])
+    region = _infer_region_from_latitude(latitude)
+    REGION_CITY_MAP[canonical_name.strip().lower()] = (region, canonical_name, latitude, longitude)
+    alias = location.get("alias")
+    if alias:
+        REGION_CITY_MAP[str(alias).strip().lower()] = (region, canonical_name, latitude, longitude)
+
+REGION_CITY_MAP["ha noi"] = REGION_CITY_MAP["hanoi"]
 
 WMO_CODE_MAP = {
     0: ("Clear", "Clear sky"),
@@ -152,6 +167,21 @@ def _aqi_level(aqi: Optional[float]):
     return "Hazardous"
 
 
+OPENWEATHERMAP_AQI_LEVELS = {
+    1: "Good",
+    2: "Fair",
+    3: "Moderate",
+    4: "Poor",
+    5: "Very Poor",
+}
+
+
+def _openweathermap_aqi_level(aqi: Optional[float]):
+    if aqi is None:
+        return None
+    return OPENWEATHERMAP_AQI_LEVELS.get(int(aqi), "Unknown")
+
+
 def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) -> NormalizedWeatherRecord:
     """Normalize raw weather payloads from Open-Meteo or OpenWeatherMap."""
     source_name = (source or record_raw.get("source") or "open-meteo").lower()
@@ -165,7 +195,13 @@ def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) 
         temp = current.get("temperature_2m")
         humidity = current.get("relative_humidity_2m")
         pressure = current.get("pressure_msl")
+        surface_pressure = current.get("surface_pressure")
         wind_speed = current.get("wind_speed_10m")
+        wind_direction = current.get("wind_direction_10m")
+        precipitation = current.get("precipitation")
+        cloud_cover = current.get("cloud_cover")
+        shortwave_radiation = current.get("shortwave_radiation")
+        soil_temperature = current.get("soil_temperature_0_to_7cm") or current.get("soil_temperature_0cm")
         weather_code = current.get("weather_code")
         weather_main, weather_desc = _format_weather_from_wmo(weather_code)
         if wind_speed is not None and source_name == "open-meteo":
@@ -183,7 +219,13 @@ def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) 
         temp = main.get("temp")
         humidity = main.get("humidity")
         pressure = main.get("pressure")
+        surface_pressure = record_raw.get("surface_pressure") or pressure
         wind_speed = wind.get("speed")
+        wind_direction = wind.get("deg")
+        precipitation = (record_raw.get("rain") or {}).get("1h") or (record_raw.get("rain") or {}).get("3h")
+        cloud_cover = (record_raw.get("clouds") or {}).get("all")
+        shortwave_radiation = record_raw.get("shortwave_radiation")
+        soil_temperature = record_raw.get("soil_temperature_0_to_7cm") or record_raw.get("soil_temperature_0cm")
         weather_main = weather.get("main")
         weather_desc = weather.get("description")
 
@@ -201,7 +243,13 @@ def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) 
         temperature_c=float(temp) if temp is not None else None,
         humidity=float(humidity) if humidity is not None else None,
         pressure_hpa=float(pressure) if pressure is not None else None,
+        surface_pressure_hpa=float(surface_pressure) if surface_pressure is not None else None,
         wind_speed_mps=float(wind_speed) if wind_speed is not None else None,
+        wind_direction_deg=float(wind_direction) if wind_direction is not None else None,
+        precipitation_mm=float(precipitation) if precipitation is not None else None,
+        cloud_cover_pct=float(cloud_cover) if cloud_cover is not None else None,
+        shortwave_radiation_wm2=float(shortwave_radiation) if shortwave_radiation is not None else None,
+        soil_temperature_0_to_7cm_c=float(soil_temperature) if soil_temperature is not None else None,
         weather_main=weather_main,
         weather_desc=weather_desc,
     )
@@ -273,6 +321,10 @@ def normalize_air_quality(record_raw: dict[str, Any], source: Optional[str] = No
         station_id = record_raw.get("station_id") or f"openweathermap_{(city or 'unknown').lower().replace(' ', '_')}"
 
     region, city_name, latitude, longitude = _infer_region_city(city, latitude, longitude)
+    if source_name == "openweathermap":
+        quality_level = _openweathermap_aqi_level(float(aqi)) if aqi is not None else None
+    else:
+        quality_level = _aqi_level(float(aqi)) if aqi is not None else None
 
     return NormalizedAirQualityRecord(
         source=source_name,
@@ -283,7 +335,7 @@ def normalize_air_quality(record_raw: dict[str, Any], source: Optional[str] = No
         longitude=float(longitude),
         event_time=_parse_datetime(event_time),
         aqi=float(aqi) if aqi is not None else None,
-        quality_level=_aqi_level(float(aqi)) if aqi is not None else None,
+        quality_level=quality_level,
         pm25=float(pm25) if pm25 is not None else None,
         pm10=float(pm10) if pm10 is not None else None,
         co=float(co) if co is not None else None,

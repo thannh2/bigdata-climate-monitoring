@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
-from confluent_kafka import Producer
 import yaml
 
 
@@ -17,10 +17,18 @@ def load_kafka_config(config_path: Path | None = None) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if "bootstrap_servers" not in data:
         raise ValueError(f"bootstrap_servers is missing in {path}")
+    override = os.getenv("KAFKA_BOOTSTRAP_SERVERS")
+    if override:
+        data["bootstrap_servers"] = [server.strip() for server in override.split(",") if server.strip()]
     return data
 
 
-def build_producer(config_path: Path | None = None) -> Producer:
+def build_producer(config_path: Path | None = None) -> Any:
+    try:
+        from confluent_kafka import Producer
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("Kafka output requires confluent-kafka. Install it with `pip install confluent-kafka`.") from exc
+
     config = load_kafka_config(config_path)
     return Producer(
         {
@@ -48,16 +56,18 @@ def send_json_message(
 
 
 def produce_json_message(
-    producer: Producer,
+    producer: Any,
     topic: str,
     message: dict[str, Any],
     key: str | None = None,
 ) -> dict[str, Any]:
     delivery_result: dict[str, Any] = {}
+    delivery_error: dict[str, Any] = {}
 
     def on_delivery(error: Any, kafka_message: Any) -> None:
         if error is not None:
-            raise RuntimeError(f"Kafka delivery failed: {error}")
+            delivery_error["error"] = error
+            return
         delivery_result.update(
             {
                 "topic": kafka_message.topic(),
@@ -72,7 +82,11 @@ def produce_json_message(
         value=json.dumps(message, ensure_ascii=True, default=str).encode("utf-8"),
         on_delivery=on_delivery,
     )
-    producer.flush()
+    remaining_messages = producer.flush()
+    if delivery_error:
+        raise RuntimeError(f"Kafka delivery failed: {delivery_error['error']}")
+    if remaining_messages:
+        raise RuntimeError(f"Kafka delivery timed out with {remaining_messages} message(s) still queued")
     if not delivery_result:
         raise RuntimeError("Kafka delivery callback did not return metadata")
     return delivery_result

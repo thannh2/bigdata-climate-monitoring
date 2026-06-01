@@ -14,6 +14,11 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from collectors.openweathermap_weather_stream_collector import (
+    OPENWEATHERMAP_WEATHER_URL,
+    fetch_openweathermap_weather,
+    resolve_api_key as resolve_owm_api_key,
+)
 from producers.dlq_producer import build_dlq_message, send_to_dlq
 from producers.kafka_producer import build_producer, produce_json_message
 from utils.checkpoint import (
@@ -23,9 +28,11 @@ from utils.checkpoint import (
     update_location_checkpoint,
 )
 from utils.logger import get_logger, log_event
+from utils.locations import OPEN_METEO_LOCATIONS, filter_locations, location_names
 from utils.metadata import build_cycle_id, enrich_ingestion_metadata
 from utils.retry import retry_call
-from utils.serialization import serialize_record
+from utils.runtime_config import build_checkpoint_path
+from utils.serialization import model_to_dict, serialize_record
 from validators.normalized_schema import normalize_weather
 from validators.weather_validator import validate_weather_record
 
@@ -33,17 +40,9 @@ from validators.weather_validator import validate_weather_record
 LOGGER = get_logger("weather_stream_collector")
 WEATHER_STREAM_TOPIC = "weather.raw.stream"
 WEATHER_DLQ_TOPIC = "weather.raw.dlq"
-CHECKPOINT_PATH = ROOT_DIR.parent / "checkpoint" / "weather_stream_checkpoint.json"
+CHECKPOINT_PATH = build_checkpoint_path("weather_stream_checkpoint.json")
 OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 PIPELINE_NAME = "weather_stream_ingestion"
-LOCATION_CATALOG = [
-    {"city": "Hanoi", "latitude": 21.0285, "longitude": 105.8542},
-    {"city": "Hai Phong", "latitude": 20.8449, "longitude": 106.6881},
-    {"city": "Da Nang", "latitude": 16.0544, "longitude": 108.2022},
-    {"city": "Hue", "latitude": 16.4637, "longitude": 107.5909},
-    {"city": "HCMC", "latitude": 10.7769, "longitude": 106.6964},
-    {"city": "Can Tho", "latitude": 10.0379, "longitude": 105.7869},
-]
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,22 +51,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dlq-topic", default=WEATHER_DLQ_TOPIC)
     parser.add_argument("--poll-seconds", type=float, default=300)
     parser.add_argument("--sleep-seconds", type=float, default=0.2)
-    parser.add_argument("--locations", nargs="*", default=[location["city"] for location in LOCATION_CATALOG])
+    parser.add_argument("--locations", nargs="*", default=location_names(OPEN_METEO_LOCATIONS))
     parser.add_argument("--checkpoint-file", default=str(CHECKPOINT_PATH))
     parser.add_argument("--run-once", action="store_true")
     return parser.parse_args()
-
-
-def filter_locations(selected_locations: list[str]) -> list[dict[str, Any]]:
-    selected = {name.strip().lower() for name in selected_locations}
-    return [location for location in LOCATION_CATALOG if location["city"].lower() in selected]
 
 
 def fetch_weather_current(location: dict[str, Any]) -> dict[str, Any]:
     params = {
         "latitude": location["latitude"],
         "longitude": location["longitude"],
-        "current": "temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code",
+        "current": (
+            "temperature_2m,relative_humidity_2m,pressure_msl,surface_pressure,"
+            "wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,"
+            "shortwave_radiation,soil_temperature_0_to_7cm,weather_code"
+        ),
         "timezone": "Asia/Bangkok",
     }
 
@@ -81,13 +79,61 @@ def fetch_weather_current(location: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _resolve_owm_fallback_api_key() -> str | None:
+    try:
+        return resolve_owm_api_key(None)
+    except Exception:
+        return None
+
+
+def _fetch_primary_or_fallback(
+    location: dict[str, Any],
+    fallback_api_key: str | None,
+) -> tuple[dict[str, Any], dict[str, Any], str, str]:
+    errors: list[str] = []
+
+    try:
+        payload = fetch_weather_current(location)
+        normalized = model_to_dict(normalize_weather(payload, source="open-meteo"))
+        serialized = serialize_record(normalized)
+        validation_errors = validate_weather_record(normalized)
+        if validation_errors:
+            raise ValueError("; ".join(validation_errors))
+        return payload, serialized, "open-meteo", OPEN_METEO_FORECAST_URL
+    except Exception as exc:
+        errors.append(f"open-meteo: {exc}")
+
+    if not fallback_api_key:
+        raise RuntimeError(" | ".join(errors))
+
+    try:
+        payload = fetch_openweathermap_weather(location, fallback_api_key)
+        normalized = model_to_dict(normalize_weather(payload, source="openweathermap"))
+        serialized = serialize_record(normalized)
+        validation_errors = validate_weather_record(normalized)
+        if validation_errors:
+            raise ValueError("; ".join(validation_errors))
+        log_event(
+            LOGGER,
+            "weather_stream_fallback_used",
+            city=location["city"],
+            fallback_source="openweathermap",
+            primary_source="open-meteo",
+        )
+        return payload, serialized, "openweathermap", OPENWEATHERMAP_WEATHER_URL
+    except Exception as exc:
+        errors.append(f"openweathermap: {exc}")
+        raise RuntimeError(" | ".join(errors))
+
+
 def main() -> None:
     args = parse_args()
-    locations = filter_locations(args.locations)
+    locations = filter_locations(OPEN_METEO_LOCATIONS, args.locations)
     if not locations:
         raise ValueError("No matching locations were selected")
 
     checkpoint_path = Path(args.checkpoint_file)
+    fallback_api_key = _resolve_owm_fallback_api_key()
     producer = build_producer()
 
     log_event(
@@ -109,30 +155,10 @@ def main() -> None:
 
             for location in locations:
                 try:
-                    payload = fetch_weather_current(location)
-                    normalized = normalize_weather(payload, source="open-meteo").dict()
-                    serialized = serialize_record(normalized)
-                    validation_errors = validate_weather_record(normalized)
-                    if validation_errors:
-                        failed_count += 1
-                        log_event(
-                            LOGGER,
-                            "weather_stream_validation_failed",
-                            city=location["city"],
-                            errors=validation_errors,
-                        )
-                        _send_dlq_event(
-                            producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="validation_failed",
-                            error_message="; ".join(validation_errors),
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=location["city"],
-                            event_time=serialized.get("event_time"),
-                            topic=args.topic,
-                        )
-                        continue
+                    payload, serialized, source_name, source_endpoint = _fetch_primary_or_fallback(
+                        location,
+                        fallback_api_key=fallback_api_key,
+                    )
 
                     event_time = serialized["event_time"]
                     if not _is_new_record(checkpoint, location["city"], event_time):
@@ -142,17 +168,6 @@ def main() -> None:
                             "weather_stream_skipped_duplicate",
                             city=location["city"],
                             event_time=event_time,
-                        )
-                        _send_dlq_event(
-                            producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="duplicate_record",
-                            error_message="Duplicate weather stream record skipped",
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=location["city"],
-                            event_time=event_time,
-                            topic=args.topic,
                         )
                         continue
 
@@ -164,14 +179,14 @@ def main() -> None:
                             serialized,
                             pipeline_name=PIPELINE_NAME,
                             batch_id=cycle_id,
-                            source_endpoint=OPEN_METEO_FORECAST_URL,
+                            source_endpoint=source_endpoint,
                         ),
                     )
                     update_location_checkpoint(
                         checkpoint,
                         city=location["city"],
                         event_time=event_time,
-                        metadata={"topic": args.topic, "offset": metadata["offset"]},
+                        metadata={"topic": args.topic, "offset": metadata["offset"], "source": source_name},
                     )
                     save_checkpoint(checkpoint_path, checkpoint)
                     produced_count += 1
@@ -180,6 +195,7 @@ def main() -> None:
                         "weather_stream_record_produced",
                         city=serialized["city"],
                         event_time=event_time,
+                        source=source_name,
                         partition=metadata["partition"],
                         offset=metadata["offset"],
                     )
@@ -194,6 +210,7 @@ def main() -> None:
                         raw_payload={"location": location},
                         city=location["city"],
                         topic=args.topic,
+                        source="open-meteo",
                     )
                 time.sleep(args.sleep_seconds)
 
@@ -238,6 +255,7 @@ def _send_dlq_event(
     raw_payload: dict[str, Any] | None,
     city: str | None,
     topic: str,
+    source: str,
     normalized_payload: dict[str, Any] | None = None,
     event_time: str | None = None,
 ) -> None:
@@ -250,7 +268,7 @@ def _send_dlq_event(
                 pipeline_name="weather_stream_ingestion",
                 batch_id=build_cycle_id("weather_stream_dlq"),
                 entity="weather",
-                source="open-meteo",
+                source=source,
                 city=city,
                 event_time=event_time,
                 topic=topic,
