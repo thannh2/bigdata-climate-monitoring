@@ -31,6 +31,12 @@ def apply_streaming_l3_stateful(df):
             
         # Sắp xếp theo chuỗi thời gian
         combined_pdf = combined_pdf.sort_values("timestamp").reset_index(drop=True)
+
+        #Áp dụng Forward Fill để lấp đầy các cảm biến bị lệch pha thời gian
+        combined_pdf = combined_pdf.ffill()
+        
+        # Để an toàn hơn, lấp ngược (Backward fill) cho dòng đầu tiên nếu nó bị Null
+        combined_pdf = combined_pdf.bfill()
         
         # 3. Biến đổi Pandas (Vectorized)
         combined_pdf["pressure_delta_3h"] = combined_pdf["pressure"] - combined_pdf["pressure"].shift(3)
