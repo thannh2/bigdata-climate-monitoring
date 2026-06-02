@@ -9,10 +9,8 @@ import mlflow
 import mlflow.spark
 from pyspark.sql import functions as F
 
-from air_quality_ml.inference.postprocess_alerts import add_alert_level, add_binary_alert
 from air_quality_ml.inference.writer_mongodb import write_predictions_to_mongo
 from air_quality_ml.settings import load_base_settings, resolve_path
-from air_quality_ml.training.thresholding import with_probability_score
 from air_quality_ml.utils.logger import get_logger, log_event
 from air_quality_ml.utils.parquet_io import read_dataset_safe, write_dataset_safe
 from air_quality_ml.utils.spark import create_spark_session
@@ -25,7 +23,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-path", required=False, default=None, help="Input feature table path")
     parser.add_argument("--output-path", required=False, default=None, help="Output prediction path")
     parser.add_argument("--horizon", required=True, type=int, help="Prediction horizon in hours")
-    parser.add_argument("--alert-threshold", required=False, type=float, default=0.5)
     parser.add_argument("--mongo-uri", required=False, default=None)
     parser.add_argument("--mongo-db", required=False, default="air_quality")
     parser.add_argument("--mongo-collection", required=False, default="realtime_predictions")
@@ -60,11 +57,6 @@ def main() -> None:
         pred_df = pred_df.withColumn("model_version", F.lit(args.model_uri))
         pred_df = pred_df.withColumn("batch_id", F.lit(batch_id))
 
-        if "probability" in pred_df.columns:
-            pred_df = with_probability_score(pred_df, probability_col="probability", score_col="pred_prob")
-            pred_df = add_binary_alert(pred_df, score_col="pred_prob", threshold=float(args.alert_threshold), output_col="pred_alert")
-            pred_df = add_alert_level(pred_df, score_col="pred_prob", output_col="alert_level")
-
         write_dataset_safe(
             pred_df,
             output_path,
@@ -96,9 +88,6 @@ def main() -> None:
                             "model_version",
                             "batch_id",
                             "prediction",
-                            "pred_prob",
-                            "pred_alert",
-                            "alert_level",
                         ]
                         if c in pred_df.columns
                     ]

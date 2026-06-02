@@ -5,10 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from air_quality_ml.data_contract.validators import validate_feature_contract
-from air_quality_ml.processing.load_features import (
-    add_alert_target_from_pm25,
-    load_and_prepare_features,
-)
+from air_quality_ml.processing.load_features import load_and_prepare_features
 from air_quality_ml.settings import load_base_settings, resolve_path
 from air_quality_ml.utils.io import write_json
 from air_quality_ml.utils.logger import get_logger, log_event
@@ -41,17 +38,6 @@ def main() -> None:
     spark = create_spark_session(settings)
     try:
         df = load_and_prepare_features(spark, features_path)
-
-        for h in settings.features.horizons:
-            pm25_col = f"target_pm25_{h}h"
-            alert_col = f"target_alert_{h}h"
-            if pm25_col in df.columns:
-                df = add_alert_target_from_pm25(
-                    df,
-                    pm25_col,
-                    alert_col,
-                    threshold=settings.features.alert_pm25_threshold,
-                )
 
         contract_report = {"status": "skipped", "reason": "disabled"}
         if settings.data_contract.enabled:

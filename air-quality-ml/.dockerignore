@@ -1,10 +1,14 @@
 .git
 .gitignore
+.dockerignore
 .venv
 venv
+env
 __pycache__
 *.pyc
 mlruns
+mlartifacts
+mlartifact
 spark-warehouse
 metastore_db
 dist
@@ -12,3 +16,8 @@ build
 *.egg-info
 coverage
 .pytest_cache
+logs
+*.log
+.mypy_cache
+.ruff_cache
+.ipynb_checkpoints

@@ -25,8 +25,3 @@ performance:
     mae_increase_warning: 0.10
     mae_increase_critical: 0.20
     mae_high_pollution_increase_critical: 0.25
-  classification:
-    recall_drop_warning_pp: 5
-    recall_drop_critical_pp: 10
-    auprc_drop_warning: 0.10
-    auprc_drop_critical: 0.20

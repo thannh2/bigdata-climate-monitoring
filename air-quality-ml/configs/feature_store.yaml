@@ -36,7 +36,6 @@ l1_features:
 l2_features:
   - theta_e
   - is_stagnant_air
-  - cooling_degree_days
 
 # L3 - Time-series features
 l3_features:

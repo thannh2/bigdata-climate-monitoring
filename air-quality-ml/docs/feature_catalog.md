@@ -17,12 +17,15 @@
 - hour_sin, hour_cos
 - theta_e
 - is_stagnant_air
-- cooling_degree_days
 - pressure_delta_3h
 - wind_shear_U, wind_shear_V
 - temp_mean_6h
 - pm25_acc_12h
 
 ## Targets
-- target_pm25_1h, target_pm25_6h, target_pm25_12h, target_pm25_24h
-- target_alert_1h, target_alert_6h, target_alert_12h, target_alert_24h
+- target_temp_[1-6]h
+- target_pm25_[1-6]h
+- target_cloud_cover_[1-6]h
+- target_precipitation_[1-6]h
+- target_wind_speed_[1-6]h
+- target_pressure_[1-6]h

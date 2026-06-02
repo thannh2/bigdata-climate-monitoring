@@ -19,12 +19,12 @@ data:
   contract_reports_path: ../../Data/gold/data_contract
 
 mlflow:
-  tracking_uri: http://host.docker.internal:5000
+  tracking_uri: http://localhost:5001
   experiment_root: air-quality
   registry_uri: null
 
 features:
-  horizons: [1, 6, 12, 24]  # Horizons có trong dữ liệu transform
+  horizons: [1, 2, 3, 4, 5, 6]  # Horizons có trong dữ liệu transform
   alert_pm25_threshold: 35.0
   high_pollution_threshold: 75.0
 
@@ -61,6 +61,3 @@ split:
 promotion:
   regression_mae_improve_ratio: 0.95
   max_mae_high_pollution_ratio: 1.0
-  classification_min_recall: 0.80
-  classification_min_auprc_ratio: 1.0
-  classification_max_fnr: 0.20

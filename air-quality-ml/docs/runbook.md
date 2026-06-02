@@ -33,21 +33,14 @@ python jobs/build_gold_features_targets.py
 
 Job nay se:
 - load transformed features tu `Data/`
-- bo sung `target_alert_*h` neu can
 - chay data contract validation
 - ghi curated dataset theo format cau hinh (`delta` mac dinh)
 
 ## 4) Train
 ```bash
-python jobs/train_pm25_h1.py
-python jobs/train_pm25_h6.py
-python jobs/train_pm25_h12.py
-python jobs/train_pm25_h24.py
-
-python jobs/train_alert_h1.py
-python jobs/train_alert_h6.py
-python jobs/train_alert_h12.py
-python jobs/train_alert_h24.py
+python -m air_quality_ml.training.train_job --base-config configs/base.yaml --job-config configs/training_temp_h1.yaml
+python -m air_quality_ml.training.train_job --base-config configs/base.yaml --job-config configs/training_pm25_h1.yaml
+python -m air_quality_ml.training.train_job --base-config configs/base.yaml --job-config configs/training_precipitation_h1.yaml
 ```
 
 ## 5) Batch score

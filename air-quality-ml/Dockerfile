@@ -24,11 +24,14 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
 WORKDIR /workspace/air-quality-ml
 
-COPY . /workspace/air-quality-ml
+COPY requirements.txt pyproject.toml /workspace/air-quality-ml/
+COPY src /workspace/air-quality-ml/src
 
 RUN python -m pip install --upgrade pip \
     && pip install -r requirements.txt \
     && pip install -e .
+
+COPY . /workspace/air-quality-ml
 
 ENTRYPOINT ["tini", "--"]
 CMD ["python", "jobs/build_gold_features_targets.py"]

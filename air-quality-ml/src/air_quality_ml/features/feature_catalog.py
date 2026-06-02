@@ -37,7 +37,6 @@ L1_FEATURES = [
 L2_FEATURES = [
     "theta_e",
     "is_stagnant_air",
-    "cooling_degree_days",
 ]
 
 # L3 - Time-series features

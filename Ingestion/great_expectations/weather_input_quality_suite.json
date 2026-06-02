@@ -45,6 +45,36 @@
     {
       "expectation_type": "expect_column_values_to_be_between",
       "kwargs": {
+        "column": "wind_direction_deg",
+        "min_value": 0,
+        "max_value": 360
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "precipitation_mm",
+        "min_value": 0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "cloud_cover_pct",
+        "min_value": 0,
+        "max_value": 100
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "shortwave_radiation_wm2",
+        "min_value": 0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
         "column": "pressure_hpa",
         "min_value": 0,
         "strict_min": true

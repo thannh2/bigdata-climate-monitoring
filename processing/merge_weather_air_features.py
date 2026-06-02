@@ -106,6 +106,11 @@ def build_base_feature_frame(records: DataFrame, start_date: str, end_date: str)
             "humidity",
             F.col("pressure_hpa").alias("pressure"),
             F.col("wind_speed_mps").alias("wind_speed"),
+            _col_or_null(records, "wind_direction_deg").alias("wind_dir"),
+            _col_or_null(records, "precipitation_mm").alias("precipitation"),
+            _col_or_null(records, "cloud_cover_pct").alias("cloud_cover"),
+            _col_or_null(records, "shortwave_radiation_wm2").alias("shortwave_radiation"),
+            _col_or_null(records, "soil_temperature_0_to_7cm_c").alias("soil_temperature"),
         )
         .dropDuplicates(["city_key", "timestamp"])
     )
@@ -140,11 +145,11 @@ def build_base_feature_frame(records: DataFrame, start_date: str, end_date: str)
         joined.withColumn("station_id", F.coalesce(F.col("weather_station_id"), F.col("air_station_id")))
         .drop("city_key", "weather_station_id", "air_station_id")
         .withColumn("elevation", F.lit(0.0))
-        .withColumn("wind_dir", F.lit(0.0))
-        .withColumn("precipitation", F.lit(0.0))
-        .withColumn("cloud_cover", F.lit(0.0))
-        .withColumn("shortwave_radiation", F.lit(0.0))
-        .withColumn("soil_temperature", F.col("temp_c"))
+        .withColumn("wind_dir", F.coalesce(F.col("wind_dir"), F.lit(0.0)))
+        .withColumn("precipitation", F.coalesce(F.col("precipitation"), F.lit(0.0)))
+        .withColumn("cloud_cover", F.coalesce(F.col("cloud_cover"), F.lit(0.0)))
+        .withColumn("shortwave_radiation", F.coalesce(F.col("shortwave_radiation"), F.lit(0.0)))
+        .withColumn("soil_temperature", F.coalesce(F.col("soil_temperature"), F.col("temp_c")))
         .withColumn("hour", F.hour("timestamp"))
         .withColumn("month", F.month("timestamp"))
         .withColumn("year", F.year("timestamp"))
@@ -206,26 +211,12 @@ def add_targets(df: DataFrame, target_hours: list[int]) -> DataFrame:
     for hours in target_hours:
         df = df.withColumn(f"target_temp_{hours}h", F.lead("temp_c", hours).over(window_spec))
         df = df.withColumn(f"target_pm25_{hours}h", F.lead("pm2_5", hours).over(window_spec))
-        df = df.withColumn(f"target_inversion_{hours}h", F.lead("is_stagnant_air", hours).over(window_spec))
-        df = df.withColumn(f"target_solar_rad_{hours}h", F.lead("shortwave_radiation", hours).over(window_spec))
-        df = df.withColumn(f"target_hvac_load_{hours}h", F.lead("cooling_degree_days", hours).over(window_spec))
+        df = df.withColumn(f"target_cloud_cover_{hours}h", F.lead("cloud_cover", hours).over(window_spec))
+        df = df.withColumn(f"target_precipitation_{hours}h", F.lead("precipitation", hours).over(window_spec))
+        df = df.withColumn(f"target_wind_speed_{hours}h", F.lead("wind_speed", hours).over(window_spec))
+        df = df.withColumn(f"target_pressure_{hours}h", F.lead("pressure", hours).over(window_spec))
 
-        if hours <= 6:
-            future_rain = F.lead("precipitation", hours).over(window_spec)
-            df = df.withColumn(
-                f"target_rain_start_{hours}h",
-                F.when((future_rain > 0) & (F.col("precipitation") == 0), 1).otherwise(0),
-            )
-
-        if hours >= 12:
-            future_wind = F.lead("wind_speed", hours).over(window_spec)
-            future_delta_p = F.lead("pressure_delta_3h", hours).over(window_spec)
-            df = df.withColumn(
-                f"target_storm_prob_{hours}h",
-                F.when((future_wind > 15) & (future_delta_p < -3), 1).otherwise(0),
-            )
-
-    return df.dropna(subset=[f"target_pm25_{max(target_hours)}h"])
+    return df
 
 
 def main() -> None:
@@ -240,20 +231,11 @@ def main() -> None:
 
         print("Merging weather and air-quality records")
         features = build_base_feature_frame(records, args.start_date, args.end_date)
-        features = features.na.fill(
-            {
-                "elevation": 0.0,
-                "wind_dir": 0.0,
-                "precipitation": 0.0,
-                "cloud_cover": 0.0,
-                "shortwave_radiation": 0.0,
-            }
-        )
 
         print("Adding engineered features and targets")
         features = add_engineered_features(features)
         features = add_time_series_features(features)
-        features = add_targets(features, target_hours=[1, 6, 12, 24])
+        features = add_targets(features, target_hours=[1, 2, 3, 4, 5, 6])
 
         print(f"Writing feature table to: {output_path}")
         features.write.mode("overwrite").partitionBy("year", "month").parquet(output_path)

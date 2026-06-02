@@ -2,7 +2,7 @@
 
 ## Luong tong quat
 1. Input cua khối ML la transformed feature table co san trong `Data/extracted features/features/`.
-2. `processing/pipeline_job.py` load parquet tu `Data/`, bo sung `target_alert_*h`, validate data contract va materialize curated ML dataset.
+2. `processing/pipeline_job.py` load parquet tu `Data/`, validate data contract va materialize curated ML dataset.
 3. Curated dataset duoc ghi ra curated storage (`delta` mac dinh) de phuc vu train, batch score va monitoring.
 4. `training/train_job.py` doc curated dataset, time-based split theo `timestamp`, train model MLlib va log vao MLflow.
 5. Evaluation snapshots duoc ghi ra `gold_eval_path`.

@@ -11,10 +11,8 @@ from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 
-from air_quality_ml.inference.postprocess_alerts import add_alert_level, add_binary_alert
 from air_quality_ml.inference.writer_mongodb import write_predictions_to_mongo
 from air_quality_ml.settings import load_base_settings, resolve_path
-from air_quality_ml.training.thresholding import with_probability_score
 from air_quality_ml.utils.logger import get_logger, log_event
 from air_quality_ml.utils.parquet_io import write_dataset_safe
 from air_quality_ml.utils.spark import create_spark_session
@@ -35,6 +33,11 @@ STREAM_SCHEMA = StructType(
         StructField("humidity", DoubleType()),
         StructField("pressure_hpa", DoubleType()),
         StructField("wind_speed_mps", DoubleType()),
+        StructField("wind_direction_deg", DoubleType()),
+        StructField("precipitation_mm", DoubleType()),
+        StructField("cloud_cover_pct", DoubleType()),
+        StructField("shortwave_radiation_wm2", DoubleType()),
+        StructField("soil_temperature_0_to_7cm_c", DoubleType()),
         StructField("aqi", DoubleType()),
         StructField("pm25", DoubleType()),
         StructField("pm10", DoubleType()),
@@ -59,7 +62,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--starting-offsets", default="latest", choices=["latest", "earliest"])
     parser.add_argument("--processing-time", default="30 seconds")
     parser.add_argument("--once", action="store_true", help="Process currently available Kafka records and exit")
-    parser.add_argument("--alert-threshold", type=float, default=0.5)
     parser.add_argument("--mongo-uri", default=None)
     parser.add_argument("--mongo-db", default="air_quality")
     parser.add_argument("--mongo-collection", default="realtime_predictions")
@@ -96,6 +98,11 @@ def build_feature_frame(events: DataFrame) -> DataFrame:
             "humidity",
             F.col("pressure_hpa").alias("pressure"),
             F.col("wind_speed_mps").alias("wind_speed"),
+            F.col("wind_direction_deg").alias("wind_dir"),
+            F.col("precipitation_mm").alias("precipitation"),
+            F.col("cloud_cover_pct").alias("cloud_cover"),
+            F.col("shortwave_radiation_wm2").alias("shortwave_radiation"),
+            F.col("soil_temperature_0_to_7cm_c").alias("soil_temperature"),
         )
         .dropna(subset=["city_key"])
     )
@@ -124,11 +131,11 @@ def build_feature_frame(events: DataFrame) -> DataFrame:
         .withColumn("station_id", F.coalesce(F.col("weather_station_id"), F.col("air_station_id")))
         .drop("city_key", "weather_station_id", "air_station_id", "weather_timestamp", "air_timestamp")
         .withColumn("elevation", F.lit(0.0))
-        .withColumn("wind_dir", F.lit(0.0))
-        .withColumn("precipitation", F.lit(0.0))
-        .withColumn("cloud_cover", F.lit(0.0))
-        .withColumn("shortwave_radiation", F.lit(0.0))
-        .withColumn("soil_temperature", F.col("temp_c"))
+        .withColumn("wind_dir", F.coalesce(F.col("wind_dir"), F.lit(0.0)))
+        .withColumn("precipitation", F.coalesce(F.col("precipitation"), F.lit(0.0)))
+        .withColumn("cloud_cover", F.coalesce(F.col("cloud_cover"), F.lit(0.0)))
+        .withColumn("shortwave_radiation", F.coalesce(F.col("shortwave_radiation"), F.lit(0.0)))
+        .withColumn("soil_temperature", F.coalesce(F.col("soil_temperature"), F.col("temp_c")))
         .withColumn("hour", F.hour("timestamp"))
         .withColumn("month", F.month("timestamp"))
         .withColumn("year", F.year("timestamp"))
@@ -216,11 +223,6 @@ def main() -> None:
                 .withColumn("batch_id", F.lit(str(batch_id)))
             )
 
-            if "probability" in pred_df.columns:
-                pred_df = with_probability_score(pred_df, probability_col="probability", score_col="pred_prob")
-                pred_df = add_binary_alert(pred_df, score_col="pred_prob", threshold=float(args.alert_threshold), output_col="pred_alert")
-                pred_df = add_alert_level(pred_df, score_col="pred_prob", output_col="alert_level")
-
             write_dataset_safe(
                 pred_df,
                 output_path,
@@ -241,9 +243,6 @@ def main() -> None:
                     "model_version",
                     "batch_id",
                     "prediction",
-                    "pred_prob",
-                    "pred_alert",
-                    "alert_level",
                 ]
                 write_predictions_to_mongo(
                     pred_df.select(*[c for c in mongo_cols if c in pred_df.columns]),

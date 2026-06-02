@@ -37,6 +37,26 @@ WEATHER_EXPECTATIONS: list[dict[str, Any]] = [
     },
     {
         "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {"column": "wind_direction_deg", "min_value": 0, "max_value": 360},
+        "description": "wind_direction_deg should be between 0 and 360 degrees",
+    },
+    {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {"column": "precipitation_mm", "min_value": 0},
+        "description": "precipitation_mm should be non-negative",
+    },
+    {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {"column": "cloud_cover_pct", "min_value": 0, "max_value": 100},
+        "description": "cloud_cover_pct should be between 0 and 100",
+    },
+    {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {"column": "shortwave_radiation_wm2", "min_value": 0},
+        "description": "shortwave_radiation_wm2 should be non-negative",
+    },
+    {
+        "expectation_type": "expect_column_values_to_be_between",
         "kwargs": {"column": "pressure_hpa", "min_value": 0, "strict_min": True},
         "description": "pressure_hpa should be positive",
     },

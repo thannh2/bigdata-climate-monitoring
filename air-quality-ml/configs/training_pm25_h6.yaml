@@ -1,4 +1,4 @@
-task: regression
+﻿task: regression
 horizon: 6
 target_col: target_pm25_6h
 prediction_col: prediction
@@ -11,10 +11,31 @@ training:
   label_col: target_pm25_6h
   max_rows: null
   dropna_label: true
+  features:
+    numeric:
+      - pm2_5
+      - us_aqi
+      - pm25_acc_12h
+      - humidity
+      - pressure
+      - wind_speed
+      - wind_dir
+      - wind_U
+      - wind_V
+      - is_stagnant_air
+      - temp_c
+      - hour_sin
+      - hour_cos
+      - coord_X
+      - coord_Y
+      - coord_Z
+    categorical:
+      - region
+      - city
 
 params:
-  maxDepth: 8
-  maxIter: 120
+  maxDepth: 6
+  maxIter: 100
   stepSize: 0.05
   subsamplingRate: 0.85
 

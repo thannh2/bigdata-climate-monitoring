@@ -28,6 +28,11 @@ class NormalizedWeatherRecord(BaseModel):
     humidity: Optional[float] = None
     pressure_hpa: Optional[float] = None
     wind_speed_mps: Optional[float] = None
+    wind_direction_deg: Optional[float] = None
+    precipitation_mm: Optional[float] = None
+    cloud_cover_pct: Optional[float] = None
+    shortwave_radiation_wm2: Optional[float] = None
+    soil_temperature_0_to_7cm_c: Optional[float] = None
     weather_main: Optional[str] = None
     weather_desc: Optional[str] = None
     data_version: str = "v1"
@@ -166,6 +171,11 @@ def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) 
         humidity = current.get("relative_humidity_2m")
         pressure = current.get("pressure_msl")
         wind_speed = current.get("wind_speed_10m")
+        wind_direction = current.get("wind_direction_10m")
+        precipitation = current.get("precipitation")
+        cloud_cover = current.get("cloud_cover")
+        shortwave_radiation = current.get("shortwave_radiation")
+        soil_temperature = current.get("soil_temperature_0_to_7cm") or current.get("soil_temperature_0_to_10cm")
         weather_code = current.get("weather_code")
         weather_main, weather_desc = _format_weather_from_wmo(weather_code)
         if wind_speed is not None and source_name == "open-meteo":
@@ -184,6 +194,11 @@ def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) 
         humidity = main.get("humidity")
         pressure = main.get("pressure")
         wind_speed = wind.get("speed")
+        wind_direction = wind.get("deg")
+        precipitation = (record_raw.get("rain") or {}).get("1h") or (record_raw.get("rain") or {}).get("3h")
+        cloud_cover = (record_raw.get("clouds") or {}).get("all")
+        shortwave_radiation = record_raw.get("shortwave_radiation")
+        soil_temperature = record_raw.get("soil_temperature")
         weather_main = weather.get("main")
         weather_desc = weather.get("description")
 
@@ -202,6 +217,11 @@ def normalize_weather(record_raw: dict[str, Any], source: Optional[str] = None) 
         humidity=float(humidity) if humidity is not None else None,
         pressure_hpa=float(pressure) if pressure is not None else None,
         wind_speed_mps=float(wind_speed) if wind_speed is not None else None,
+        wind_direction_deg=float(wind_direction) if wind_direction is not None else None,
+        precipitation_mm=float(precipitation) if precipitation is not None else None,
+        cloud_cover_pct=float(cloud_cover) if cloud_cover is not None else None,
+        shortwave_radiation_wm2=float(shortwave_radiation) if shortwave_radiation is not None else None,
+        soil_temperature_0_to_7cm_c=float(soil_temperature) if soil_temperature is not None else None,
         weather_main=weather_main,
         weather_desc=weather_desc,
     )

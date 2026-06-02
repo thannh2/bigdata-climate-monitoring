@@ -28,7 +28,8 @@ def load_and_prepare_features(
     - L1: coord_X/Y/Z, wind_U/V, air_density, dew_point, hour_sin/cos
     - L2: theta_e, is_stagnant_air, cooling_degree_days
     - L3: pressure_delta_3h, wind_shear_U/V, temp_mean_6h, pm25_acc_12h
-    - L4: target_pm25_[1,6,12,24]h, target_temp_*, target_inversion_*, etc.
+    - L4: target_temp_*, target_pm25_*, target_cloud_cover_*,
+      target_precipitation_*, target_wind_speed_*, target_pressure_*
     """
     # Use centralized parquet reader with Windows compatibility
     df = read_parquet_safe(spark, features_path, use_pandas_workaround)

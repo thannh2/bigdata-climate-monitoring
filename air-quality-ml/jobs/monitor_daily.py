@@ -8,7 +8,7 @@ import pandas as pd
 from pyspark.sql import functions as F
 
 from air_quality_ml.monitoring.data_quality import duplicate_rate, ingestion_delay_stats, missing_rate, station_silence
-from air_quality_ml.monitoring.performance import classification_drift_status, regression_drift_status
+from air_quality_ml.monitoring.performance import regression_drift_status
 from air_quality_ml.settings import load_base_settings, read_yaml, resolve_path
 from air_quality_ml.utils.logger import get_logger, log_event
 from air_quality_ml.utils.parquet_io import read_dataset_safe, write_dataset_safe
@@ -173,33 +173,6 @@ def _performance_rows(spark, eval_path: str, eval_format: str, snapshot_ts: str,
                     "horizon": int(horizon),
                     "data_window": "test_vs_previous_run",
                     "baseline_metric_value": previous_mae,
-                }
-            )
-        elif task == "classification":
-            current_recall = float(current["metrics"].get("recall", 0.0))
-            current_auprc = float(current["metrics"].get("auprc", 0.0))
-            previous_recall = float(previous["metrics"].get("recall", 0.0))
-            previous_auprc = float(previous["metrics"].get("auprc", 0.0))
-            status = classification_drift_status(
-                current_recall=current_recall,
-                baseline_recall=previous_recall,
-                current_auprc=current_auprc,
-                baseline_auprc=previous_auprc,
-            )
-            rows.append(
-                {
-                    "metric_time": snapshot_ts,
-                    "metric_date": metric_date,
-                    "metric_category": "performance",
-                    "metric_name": "classification_drift_status",
-                    "metric_value": current_auprc,
-                    "severity": status,
-                    "model_name": model_name,
-                    "horizon": int(horizon),
-                    "data_window": "test_vs_previous_run",
-                    "baseline_metric_value": previous_auprc,
-                    "current_recall": current_recall,
-                    "baseline_recall": previous_recall,
                 }
             )
 

@@ -65,7 +65,7 @@ def create_spark_session(settings: BaseSettings) -> SparkSession:
             builder
             .config("spark.hadoop.io.native.lib.available", "false")
             # Use RawLocalFileSystem to bypass native Windows file access
-            .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.RawLocalFileSystem")
+            .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
         )
     
     spark = builder.getOrCreate()

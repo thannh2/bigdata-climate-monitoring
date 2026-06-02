@@ -20,7 +20,7 @@ def _mongo_config() -> tuple[str, str, str]:
     )
 
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=30)
 def load_realtime(limit: int = 500) -> pd.DataFrame:
     mongo_uri, database, collection = _mongo_config()
     client = MongoClient(mongo_uri, serverSelectionTimeoutMS=3000)

@@ -25,8 +25,6 @@
 | wind_direction_deg | wind_dir |
 | precipitation_mm | precipitation |
 | cloud_cover_pct | cloud_cover |
-| shortwave_radiation_wm2 | shortwave_radiation |
-| soil_temperature_0_to_7cm_c | soil_temperature |
 | pm25 | pm2_5 |
 | aqi | us_aqi |
 | coord_x/y/z | coord_X/Y/Z |
@@ -39,7 +37,7 @@ Dữ liệu đã transform có đầy đủ:
 **L0 (Raw)**:
 - station_id, timestamp, latitude, longitude
 - temp_c, humidity, pressure, wind_speed, wind_dir
-- precipitation, cloud_cover, shortwave_radiation, soil_temperature
+- precipitation, cloud_cover
 - pm2_5, us_aqi
 
 **L1 (Engineered)**:
@@ -51,7 +49,6 @@ Dữ liệu đã transform có đầy đủ:
 **L2 (Domain)**:
 - theta_e
 - is_stagnant_air
-- cooling_degree_days
 
 **L3 (Time-series)**:
 - pressure_delta_3h
@@ -60,13 +57,12 @@ Dữ liệu đã transform có đầy đủ:
 - pm25_acc_12h
 
 **L4 (Targets)**:
-- target_pm25_[1,6,12,24]h
-- target_temp_[1,6,12,24]h
-- target_inversion_[1,6,12,24]h
-- target_solar_rad_[1,6,12,24]h
-- target_hvac_load_[1,6,12,24]h
-- target_rain_start_[1,6]h
-- target_storm_prob_[12,24]h
+- target_temp_[1-6]h
+- target_pm25_[1-6]h
+- target_cloud_cover_[1-6]h
+- target_precipitation_[1-6]h
+- target_wind_speed_[1-6]h
+- target_pressure_[1-6]h
 
 ### 5. Cấu hình mới
 
@@ -95,33 +91,20 @@ df = load_and_prepare_features(spark, features_path)
 
 **Training**:
 ```python
-# Targets có sẵn: target_pm25_1h, target_pm25_6h, etc.
+# Targets có sẵn: target_temp_1h, target_pm25_1h,
+# target_precipitation_1h, target_wind_speed_1h, etc.
 target_col = "target_pm25_1h"
-
-# Thêm alert target nếu cần
-from air_quality_ml.processing.load_features import add_alert_target_from_pm25
-
-df = add_alert_target_from_pm25(
-    df, 
-    pm25_target_col="target_pm25_1h",
-    alert_target_col="target_alert_1h",
-    threshold=35.0
-)
 ```
 
 ### 7. Horizons hỗ trợ
 
-Dữ liệu transform có targets cho horizons: **1h, 6h, 12h, 24h**
+Dữ liệu transform có targets cho horizons: **1h, 2h, 3h, 4h, 5h, 6h**
 
 Config mặc định trong `base.yaml`:
 ```yaml
 features:
-  horizons: [1, 3, 6, 12, 24]
+  horizons: [1, 2, 3, 4, 5, 6]
 ```
-
-**Lưu ý**: Horizon 3h không có trong dữ liệu transform, cần điều chỉnh:
-- Sử dụng: [1, 6, 12, 24]
-- Hoặc tạo thêm target_pm25_3h bằng interpolation
 
 ### 8. Partition
 
@@ -137,13 +120,9 @@ cd air-quality-ml
 # Kiểm tra dữ liệu
 python jobs/build_gold_features_targets.py --base-config configs/base.yaml
 
-# Training PM2.5 forecast
-python jobs/train_pm25_h1.py
-python jobs/train_pm25_h6.py
-
-# Training Alert classifier
-python jobs/train_alert_h1.py
-python jobs/train_alert_h6.py
+# Training target xanh
+python -m air_quality_ml.training.train_job --base-config configs/base.yaml --job-config configs/training_pm25_h1.yaml
+python -m air_quality_ml.training.train_job --base-config configs/base.yaml --job-config configs/training_precipitation_h1.yaml
 ```
 
 ### 10. Điều chỉnh cần thiết

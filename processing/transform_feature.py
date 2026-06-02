@@ -10,6 +10,9 @@ def create_spark_session() -> SparkSession:
         .config("spark.driver.memory", "4g") \
         .getOrCreate()
 
+def col_or_null(df, column_name: str):
+    return F.col(column_name) if column_name in df.columns else F.lit(None)
+
 def main():
     spark = create_spark_session()
     
@@ -34,11 +37,11 @@ def main():
         F.col("humidity"),
         F.col("pressure_hpa").alias("pressure"),
         F.col("wind_speed_mps").alias("wind_speed"),
-        F.col("wind_direction_deg").alias("wind_dir"),
-        F.col("precipitation_mm").alias("precipitation"),
-        F.col("cloud_cover_pct").alias("cloud_cover"),
-        F.col("shortwave_radiation_wm2").alias("shortwave_radiation"),
-        F.col("soil_temperature_0_to_7cm_c").alias("soil_temperature"),
+        col_or_null(df, "wind_direction_deg").alias("wind_dir"),
+        col_or_null(df, "precipitation_mm").alias("precipitation"),
+        col_or_null(df, "cloud_cover_pct").alias("cloud_cover"),
+        col_or_null(df, "shortwave_radiation_wm2").alias("shortwave_radiation"),
+        col_or_null(df, "soil_temperature_0_to_7cm_c").alias("soil_temperature"),
         F.col("pm25").alias("pm2_5"),
         F.col("aqi").alias("us_aqi")
     ).na.fill(0)
@@ -96,26 +99,17 @@ def main():
 
     print("[*] Đang tính toán Lớp 4 (L4) - Biến mục tiêu (Targets)...")
     # ================= L4 FEATURES =================
-    target_hours = [1, 6, 12, 24] 
+    target_hours = [1, 2, 3, 4, 5, 6] 
     
     for n in target_hours:
         df = df.withColumn(f"target_temp_{n}h", F.lead("temp_c", n).over(window_spec))
         df = df.withColumn(f"target_pm25_{n}h", F.lead("pm2_5", n).over(window_spec))
-        df = df.withColumn(f"target_inversion_{n}h", F.lead("is_stagnant_air", n).over(window_spec))
-        df = df.withColumn(f"target_solar_rad_{n}h", F.lead("shortwave_radiation", n).over(window_spec))
-        df = df.withColumn(f"target_hvac_load_{n}h", F.lead("cooling_degree_days", n).over(window_spec))
-        
-        if n <= 6:
-            df = df.withColumn(f"target_rain_start_{n}h", 
-                F.when((F.lead("precipitation", n).over(window_spec) > 0) & (F.col("precipitation") == 0), 1).otherwise(0))
-        
-        if n >= 12:
-            future_wind = F.lead("wind_speed", n).over(window_spec)
-            future_delta_p = F.lead("pressure_delta_3h", n).over(window_spec)
-            df = df.withColumn(f"target_storm_prob_{n}h", 
-                F.when((future_wind > 15) & (future_delta_p < -3), 1).otherwise(0))
+        df = df.withColumn(f"target_cloud_cover_{n}h", F.lead("cloud_cover", n).over(window_spec))
+        df = df.withColumn(f"target_precipitation_{n}h", F.lead("precipitation", n).over(window_spec))
+        df = df.withColumn(f"target_wind_speed_{n}h", F.lead("wind_speed", n).over(window_spec))
+        df = df.withColumn(f"target_pressure_{n}h", F.lead("pressure", n).over(window_spec))
 
-    df_final = df.dropna(subset=[f"target_temp_{target_hours[-1]}h"])
+    df_final = df.dropna(subset=[f"target_pm25_{target_hours[-1]}h"])
 
     print(f"[*] Đang lưu Dữ liệu Vàng xuống HDFS tại: {output_hdfs}")
     df_final.write \

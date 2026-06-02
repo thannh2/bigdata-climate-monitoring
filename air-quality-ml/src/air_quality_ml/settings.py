@@ -38,13 +38,10 @@ class SplitConfig(BaseModel):
 class PromotionConfig(BaseModel):
     regression_mae_improve_ratio: float = 0.95
     max_mae_high_pollution_ratio: float = 1.0
-    classification_min_recall: float = 0.80
-    classification_min_auprc_ratio: float = 1.0
-    classification_max_fnr: float = 0.20
 
 
 class FeatureDefaults(BaseModel):
-    horizons: list[int] = Field(default_factory=lambda: [1, 6, 12, 24])
+    horizons: list[int] = Field(default_factory=lambda: [1, 2, 3, 4, 5, 6])
     alert_pm25_threshold: float = 35.0
     high_pollution_threshold: float = 75.0
 
@@ -98,13 +95,11 @@ class JobConfig(BaseModel):
     horizon: int
     target_col: str
     prediction_col: str = "prediction"
-    probability_col: Optional[str] = "probability"
     model_type: str
     model_name: str
     experiment_name: str
     training: Dict[str, Any] = Field(default_factory=dict)
     params: Dict[str, Any] = Field(default_factory=dict)
-    threshold_tuning: Dict[str, Any] = Field(default_factory=dict)
     register_if_pass: bool = True
 
 

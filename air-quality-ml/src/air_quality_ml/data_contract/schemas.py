@@ -36,9 +36,18 @@ def build_feature_table_contract(settings: BaseSettings, feature_store_cfg: dict
     l2_features = list(feature_store_cfg.get("l2_features", []))
     l3_features = list(feature_store_cfg.get("l3_features", []))
 
-    target_columns = [f"target_pm25_{h}h" for h in settings.features.horizons] + [
-        f"target_alert_{h}h" for h in settings.features.horizons
-    ]
+    target_columns = []
+    for horizon in settings.features.horizons:
+        target_columns.extend(
+            [
+                f"target_temp_{horizon}h",
+                f"target_pm25_{horizon}h",
+                f"target_cloud_cover_{horizon}h",
+                f"target_precipitation_{horizon}h",
+                f"target_wind_speed_{horizon}h",
+                f"target_pressure_{horizon}h",
+            ]
+        )
 
     required_columns = [
         ColumnContract(name="station_id", expected_family="string", nullable=False),
@@ -68,7 +77,7 @@ def build_feature_table_contract(settings: BaseSettings, feature_store_cfg: dict
         required_columns.append(
             ColumnContract(
                 name=name,
-                expected_family="integer" if name.startswith("target_alert_") else "numeric",
+                expected_family="numeric",
                 nullable=True,
             )
         )

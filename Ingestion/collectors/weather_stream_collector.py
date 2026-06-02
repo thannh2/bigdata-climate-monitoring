@@ -61,7 +61,11 @@ def fetch_weather_current(location: dict[str, Any]) -> dict[str, Any]:
     params = {
         "latitude": location["latitude"],
         "longitude": location["longitude"],
-        "current": "temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code",
+        "current": (
+            "temperature_2m,relative_humidity_2m,pressure_msl,"
+            "wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,"
+            "shortwave_radiation,soil_temperature_0_to_10cm,weather_code"
+        ),
         "timezone": "Asia/Bangkok",
     }
 
