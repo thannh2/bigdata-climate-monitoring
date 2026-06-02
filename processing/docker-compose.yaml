@@ -70,6 +70,10 @@ services:
     ports:
       - "8080:8080"
       - "7077:7077"
+    volumes:
+      - ../:/workspace
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   spark-worker:
     image: bitnamilegacy/spark:3.5.1
@@ -81,3 +85,7 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     depends_on:
       - spark-master
+    volumes:
+      - ./:/workspace
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
