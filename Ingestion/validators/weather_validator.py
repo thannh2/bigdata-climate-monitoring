@@ -16,7 +16,17 @@ def validate_weather_record(record: dict[str, Any]) -> list[str]:
         elif not isinstance(value, (int, float)) or not isfinite(float(value)):
             errors.append(f"{field} must be numeric")
 
-    numeric_fields = ("temperature_c", "humidity", "pressure_hpa", "wind_speed_mps")
+    numeric_fields = (
+        "temperature_c",
+        "humidity",
+        "pressure_hpa",
+        "wind_speed_mps",
+        "wind_direction_deg",
+        "precipitation_mm",
+        "cloud_cover_pct",
+        "shortwave_radiation_wm2",
+        "soil_temperature_0_to_7cm_c",
+    )
     for field in numeric_fields:
         value = record.get(field)
         if value is None:

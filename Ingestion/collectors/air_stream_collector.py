@@ -27,7 +27,7 @@ from utils.locations import OPEN_METEO_LOCATIONS, filter_locations, location_nam
 from utils.metadata import build_cycle_id, enrich_ingestion_metadata
 from utils.retry import retry_call
 from utils.runtime_config import build_checkpoint_path
-from utils.serialization import serialize_record
+from utils.serialization import model_to_dict, serialize_record
 from validators.air_validator import validate_air_record
 from validators.normalized_schema import normalize_air_quality
 
@@ -99,7 +99,7 @@ def main() -> None:
             for location in locations:
                 try:
                     payload = fetch_air_current(location)
-                    normalized = normalize_air_quality(payload, source="open-meteo").dict()
+                    normalized = model_to_dict(normalize_air_quality(payload, source="open-meteo"))
                     serialized = serialize_record(normalized)
                     validation_errors = validate_air_record(normalized)
                     if validation_errors:
@@ -131,17 +131,6 @@ def main() -> None:
                             "air_stream_skipped_duplicate",
                             city=location["city"],
                             event_time=event_time,
-                        )
-                        _send_dlq_event(
-                            producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="duplicate_record",
-                            error_message="Duplicate air stream record skipped",
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=location["city"],
-                            event_time=event_time,
-                            topic=args.topic,
                         )
                         continue
 

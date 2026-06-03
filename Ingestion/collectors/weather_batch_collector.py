@@ -49,7 +49,11 @@ def fetch_weather_history(location: dict[str, Any], start_date: str, end_date: s
         "longitude": location["longitude"],
         "start_date": start_date,
         "end_date": end_date,
-        "hourly": "temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code",
+        "hourly": (
+            "temperature_2m,relative_humidity_2m,pressure_msl,"
+            "wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,"
+            "shortwave_radiation,soil_temperature_0_to_7cm,weather_code"
+        ),
         "timezone": "Asia/Bangkok",
     }
 
@@ -78,6 +82,11 @@ def iter_hourly_weather_records(payload: dict[str, Any], city: str) -> list[dict
                     "relative_humidity_2m": _safe_array_value(hourly.get("relative_humidity_2m"), index),
                     "pressure_msl": _safe_array_value(hourly.get("pressure_msl"), index),
                     "wind_speed_10m": _safe_array_value(hourly.get("wind_speed_10m"), index),
+                    "wind_direction_10m": _safe_array_value(hourly.get("wind_direction_10m"), index),
+                    "precipitation": _safe_array_value(hourly.get("precipitation"), index),
+                    "cloud_cover": _safe_array_value(hourly.get("cloud_cover"), index),
+                    "shortwave_radiation": _safe_array_value(hourly.get("shortwave_radiation"), index),
+                    "soil_temperature_0_to_7cm": _safe_array_value(hourly.get("soil_temperature_0_to_7cm"), index),
                     "weather_code": _safe_array_value(hourly.get("weather_code"), index),
                 },
             }

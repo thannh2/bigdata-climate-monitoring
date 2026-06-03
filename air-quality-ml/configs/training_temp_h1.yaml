@@ -1,0 +1,40 @@
+﻿task: regression
+horizon: 1
+target_col: target_temp_1h
+prediction_col: prediction
+model_type: gbt
+model_name: weather_temp_forecast_h1
+experiment_name: weather/forecast-temp/h1
+threshold_col: null
+
+training:
+  label_col: target_temp_1h
+  max_rows: null
+  dropna_label: true
+  features:
+    numeric:
+      - temp_c
+      - humidity
+      - pressure
+      - wind_speed
+      - wind_dir
+      - cloud_cover
+      - shortwave_radiation
+      - soil_temperature
+      - hour_sin
+      - hour_cos
+      - coord_X
+      - coord_Y
+      - coord_Z
+      - temp_mean_6h
+    categorical:
+      - region
+      - city
+
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
+
+register_if_pass: true

@@ -32,7 +32,7 @@ from utils.locations import OPEN_METEO_LOCATIONS, filter_locations, location_nam
 from utils.metadata import build_cycle_id, enrich_ingestion_metadata
 from utils.retry import retry_call
 from utils.runtime_config import build_checkpoint_path
-from utils.serialization import serialize_record
+from utils.serialization import model_to_dict, serialize_record
 from validators.normalized_schema import normalize_weather
 from validators.weather_validator import validate_weather_record
 
@@ -61,7 +61,11 @@ def fetch_weather_current(location: dict[str, Any]) -> dict[str, Any]:
     params = {
         "latitude": location["latitude"],
         "longitude": location["longitude"],
-        "current": "temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code",
+        "current": (
+            "temperature_2m,relative_humidity_2m,pressure_msl,"
+            "wind_speed_10m,wind_direction_10m,precipitation,cloud_cover,"
+            "shortwave_radiation,soil_temperature_0_to_10cm,weather_code"
+        ),
         "timezone": "Asia/Bangkok",
     }
 
@@ -90,7 +94,7 @@ def _fetch_primary_or_fallback(
 
     try:
         payload = fetch_weather_current(location)
-        normalized = normalize_weather(payload, source="open-meteo").dict()
+        normalized = model_to_dict(normalize_weather(payload, source="open-meteo"))
         serialized = serialize_record(normalized)
         validation_errors = validate_weather_record(normalized)
         if validation_errors:
@@ -104,7 +108,7 @@ def _fetch_primary_or_fallback(
 
     try:
         payload = fetch_openweathermap_weather(location, fallback_api_key)
-        normalized = normalize_weather(payload, source="openweathermap").dict()
+        normalized = model_to_dict(normalize_weather(payload, source="openweathermap"))
         serialized = serialize_record(normalized)
         validation_errors = validate_weather_record(normalized)
         if validation_errors:
@@ -164,18 +168,6 @@ def main() -> None:
                             "weather_stream_skipped_duplicate",
                             city=location["city"],
                             event_time=event_time,
-                        )
-                        _send_dlq_event(
-                            producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="duplicate_record",
-                            error_message="Duplicate weather stream record skipped",
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=location["city"],
-                            event_time=event_time,
-                            topic=args.topic,
-                            source=source_name,
                         )
                         continue
 

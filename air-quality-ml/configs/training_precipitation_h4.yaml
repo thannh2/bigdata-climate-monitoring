@@ -1,0 +1,43 @@
+﻿task: regression
+horizon: 4
+target_col: target_precipitation_4h
+prediction_col: prediction
+model_type: gbt
+model_name: weather_precipitation_forecast_h4
+experiment_name: weather/forecast-precipitation/h4
+threshold_col: null
+
+training:
+  label_col: target_precipitation_4h
+  max_rows: null
+  dropna_label: true
+  features:
+    numeric:
+      - precipitation
+      - cloud_cover
+      - humidity
+      - pressure
+      - pressure_delta_3h
+      - temp_c
+      - dew_point
+      - theta_e
+      - wind_speed
+      - wind_dir
+      - wind_U
+      - wind_V
+      - hour_sin
+      - hour_cos
+      - coord_X
+      - coord_Y
+      - coord_Z
+    categorical:
+      - region
+      - city
+
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
+
+register_if_pass: true

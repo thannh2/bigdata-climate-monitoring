@@ -30,7 +30,7 @@ from utils.locations import IQAIR_LOCATIONS, display_location, filter_locations,
 from utils.metadata import build_cycle_id, enrich_ingestion_metadata
 from utils.retry import retry_call
 from utils.runtime_config import ENV_PATH, build_checkpoint_path
-from utils.serialization import serialize_record
+from utils.serialization import model_to_dict, serialize_record
 from validators.air_validator import validate_air_record
 from validators.normalized_schema import normalize_air_quality
 
@@ -133,7 +133,7 @@ def main() -> None:
                 city_name = display_location(location)
                 try:
                     payload = fetch_iqair_current(location, api_key)
-                    normalized = normalize_air_quality(payload, source="iqair").dict()
+                    normalized = model_to_dict(normalize_air_quality(payload, source="iqair"))
                     serialized = serialize_record(normalized)
                     validation_errors = validate_air_record(normalized)
                     if validation_errors:
@@ -165,17 +165,6 @@ def main() -> None:
                             "iqair_air_skipped_duplicate",
                             city=city_name,
                             event_time=event_time,
-                        )
-                        _send_dlq_event(
-                            producer=producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="duplicate_record",
-                            error_message="Duplicate IQAir air record skipped",
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=city_name,
-                            event_time=event_time,
-                            topic=args.topic,
                         )
                         continue
 
