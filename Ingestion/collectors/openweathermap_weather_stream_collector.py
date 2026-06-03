@@ -29,7 +29,7 @@ from utils.locations import OPEN_METEO_LOCATIONS, filter_locations, location_nam
 from utils.metadata import build_cycle_id, enrich_ingestion_metadata
 from utils.retry import retry_call
 from utils.runtime_config import ENV_PATH, build_checkpoint_path
-from utils.serialization import serialize_record
+from utils.serialization import model_to_dict, serialize_record
 from validators.normalized_schema import normalize_weather
 from validators.weather_validator import validate_weather_record
 
@@ -113,7 +113,7 @@ def main() -> None:
             for location in locations:
                 try:
                     payload = fetch_openweathermap_weather(location, api_key)
-                    normalized = normalize_weather(payload, source="openweathermap").dict()
+                    normalized = model_to_dict(normalize_weather(payload, source="openweathermap"))
                     serialized = serialize_record(normalized)
                     validation_errors = validate_weather_record(normalized)
                     if validation_errors:
@@ -145,17 +145,6 @@ def main() -> None:
                             "openweathermap_weather_skipped_duplicate",
                             city=location["city"],
                             event_time=event_time,
-                        )
-                        _send_dlq_event(
-                            producer=producer,
-                            dlq_topic=args.dlq_topic,
-                            error_type="duplicate_record",
-                            error_message="Duplicate OpenWeatherMap weather record skipped",
-                            raw_payload=payload,
-                            normalized_payload=serialized,
-                            city=location["city"],
-                            event_time=event_time,
-                            topic=args.topic,
                         )
                         continue
 

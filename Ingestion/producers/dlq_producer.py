@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from confluent_kafka import Producer
-
 from producers.kafka_producer import produce_json_message
 
 
@@ -40,7 +38,7 @@ def build_dlq_message(
 
 
 def send_to_dlq(
-    producer: Producer,
+    producer: Any,
     dlq_topic: str,
     message: dict[str, Any],
     key: str | None = None,

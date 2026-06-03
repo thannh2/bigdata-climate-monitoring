@@ -4,8 +4,7 @@ This folder contains the Airflow DAGs used to orchestrate ingestion runs.
 
 ## DAGs
 
-- `historical_ingestion_dag`: batch ingestion with `start_date` and `end_date`
-- `streaming_trigger_dag`: one streaming polling cycle across configured sources
+- `streaming_trigger_dag`: one production streaming polling cycle for weather and air quality
 
 ## Main file
 
@@ -15,7 +14,8 @@ This folder contains the Airflow DAGs used to orchestrate ingestion runs.
 
 - start Kafka first so the Docker network `ingestion_kafka_network` exists
 - use the repository root compose file `docker-compose.airflow.yml`
-- provide `OWM_API_KEY`, `AQICN_API_KEY`, and `IQAIR_API_KEY` if you want all multi-source stream tasks to run successfully
+- provide `AQICN_API_KEY` for air-quality ingestion
+- provide `OWM_API_KEY` and `IQAIR_API_KEY` to enable weather and air-quality fallback sources
 
 ## Local UI
 

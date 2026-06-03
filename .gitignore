@@ -45,6 +45,12 @@ airflow-webserver.pid
 # Generated data files
 *.parquet
 *.avro
+*.json
+*.jsonl
+*.csv
+
+# Image
+images/
 
 # Local-only handover docs
 Ingestion/docs/
