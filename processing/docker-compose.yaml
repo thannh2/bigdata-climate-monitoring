@@ -89,3 +89,4 @@ services:
       - ./:/workspace
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - spark-master

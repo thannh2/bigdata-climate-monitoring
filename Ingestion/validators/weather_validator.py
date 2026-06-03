@@ -20,7 +20,6 @@ def validate_weather_record(record: dict[str, Any]) -> list[str]:
         "temperature_c",
         "humidity",
         "pressure_hpa",
-        "surface_pressure_hpa",
         "wind_speed_mps",
         "wind_direction_deg",
         "precipitation_mm",
