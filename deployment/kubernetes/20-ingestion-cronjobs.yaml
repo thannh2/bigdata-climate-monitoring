@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: weather-ingestion
+  namespace: climate-monitoring
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: weather-ingestion
+              image: climate-ingestion:local
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+              args:
+                - Ingestion/collectors/weather_stream_collector.py
+                - --run-once
+              envFrom:
+                - configMapRef:
+                    name: climate-config
+                - secretRef:
+                    name: climate-secrets
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: air-quality-ingestion
+  namespace: climate-monitoring
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: air-quality-ingestion
+              image: climate-ingestion:local
+              imagePullPolicy: IfNotPresent
+              command:
+                - python
+              args:
+                - Ingestion/collectors/aqicn_air_stream_collector.py
+                - --run-once
+              envFrom:
+                - configMapRef:
+                    name: climate-config
+                - secretRef:
+                    name: climate-secrets

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: climate-config
+  namespace: climate-monitoring
+data:
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+  KAFKA_TOPICS: "weather.raw.stream,air_quality.raw.stream"
+  REDIS_URL: "redis://redis:6379/0"
+  MONGO_URI: "mongodb://mongodb:27017"
+  MONGO_DB: "air_quality"
+  MONGO_COLLECTION: "realtime_predictions"
+  MLFLOW_TRACKING_URI: "http://mlflow:5000"
+  HISTORICAL_PREDICTIONS_PATH: "/workspace/Data/gold/predictions"
+  STREAM_PREDICTIONS_PATH: "/workspace/Data/gold/predictions_stream"
+  MONITORING_PATH: "/workspace/Data/gold/monitoring"
+  AIRFLOW__CORE__EXECUTOR: "LocalExecutor"
+  AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+  AIRFLOW__CORE__DAGS_FOLDER: "/opt/airflow/Ingestion/airflow"
+  AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: "Asia/Bangkok"
