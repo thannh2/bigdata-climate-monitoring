@@ -1,89 +1,117 @@
 import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
 from pyspark.ml import PipelineModel
-
+from processing.schemas.schemas import get_l0_unified_schema
+from processing.utils.utils_features import apply_l1_l2_transforms
 from processing.utils.utils_streaming_l3 import apply_streaming_l3_stateful
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
 
-def get_l0_weather_schema():
-    """Schema L0 mapping 1:1 với NormalizedWeatherRecord từ Kafka"""
-    return StructType([
-        StructField("event_id", StringType(), True),
-        StructField("source", StringType(), True),
-        StructField("region", StringType(), True),
-        StructField("city", StringType(), True),
-        StructField("station_id", StringType(), True),
-        StructField("latitude", DoubleType(), True),
-        StructField("longitude", DoubleType(), True),
-        StructField("event_time", TimestampType(), True),
-        StructField("ingestion_time", TimestampType(), True),
-        StructField("temperature_c", DoubleType(), True),
-        StructField("humidity", DoubleType(), True),
-        StructField("pressure_hpa", DoubleType(), True),
-        StructField("surface_pressure_hpa", DoubleType(), True),
-        StructField("wind_speed_mps", DoubleType(), True),
-        StructField("wind_direction_deg", DoubleType(), True),
-        StructField("precipitation_mm", DoubleType(), True),
-        StructField("cloud_cover_pct", DoubleType(), True),
-        StructField("shortwave_radiation_wm2", DoubleType(), True),
-        StructField("soil_temperature_0_to_7cm_c", DoubleType(), True),
-        StructField("weather_main", StringType(), True),
-        StructField("weather_desc", StringType(), True),
-        StructField("data_version", StringType(), True)
-    ])
-    ])
-
-def main():
-    # 1. Khởi tạo SparkSession
-    spark = SparkSession.builder \
-        .appName("Weather_Streaming_Predict") \
-        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0") \
-        .getOrCreate()
-
-    # Giảm log rác của Spark trên console
-    spark.sparkContext.setLogLevel("WARN")
-
-    # 2. Cấu hình Kafka (Được trích xuất từ Ingestion config)
-    KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-    KAFKA_TOPIC = "weather.raw.stream"
-    
-    # Load Mô hình (Thay thế bằng đường dẫn HDFS thực tế của bạn)
-    # model_path = "hdfs://namenode:8020/models/weather_classification_model"
-    # model = PipelineModel.load(model_path)
-
-    # 3. Đọc dữ liệu từ Kafka
-    kafka_stream = spark.readStream \
+def read_kafka_source(spark: SparkSession, servers: str, topic: str):
+    return spark.readStream \
         .format("kafka") \
-        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
-        .option("subscribe", KAFKA_TOPIC) \
+        .option("kafka.bootstrap.servers", servers) \
+        .option("subscribe", topic) \
         .option("startingOffsets", "latest") \
+        .option("failOnDataLoss", "false") \
         .load()
 
-    # 4. Parse JSON Payload
-    l0_schema = get_l0_weather_schema()
-    parsed_stream = kafka_stream.select(
-        F.from_json(F.col("value").cast("string"), l0_schema).alias("data")
+def parse_and_rename_l0(kafka_df):
+    """Giải mã JSON bằng Unified Schema và áp dụng Spatial Merge"""
+    schema = get_l0_unified_schema()
+    
+    parsed_df = kafka_df.select(
+        F.from_json(F.col("value").cast("string"), schema).alias("data")
     ).select("data.*")
 
-    # 5. Áp dụng Feature Engineering (Watermark là bắt buộc với Streaming)
-    watermarked_stream = parsed_stream.withWatermark("timestamp", "2 hours")
-    
-    # Gọi hàm xử lý L1-L3 của bạn
-    # features_stream = apply_streaming_l3_stateful(watermarked_stream)
-    features_stream = watermarked_stream # Tạm gán để chạy thử
+    return parsed_df.select(
+        # 2. HỢP NHẤT KHÔNG GIAN: Dùng city làm khóa gom nhóm thay vì station_id thô
+        F.lower(F.trim(F.col("city"))).alias("station_id"), 
+        F.col("event_time").alias("timestamp"),
+        F.col("latitude"), F.col("longitude"),
+        F.lit(0.0).alias("elevation"),
+        F.col("temperature_c").alias("temp_c"),
+        F.col("humidity"), 
+        F.col("pressure_hpa").alias("pressure"),
+        F.col("wind_speed_mps").alias("wind_speed"),
+        F.col("wind_direction_deg").alias("wind_dir"),
+        F.col("precipitation_mm").alias("precipitation"),
+        F.col("cloud_cover_pct").alias("cloud_cover"),
+        F.col("shortwave_radiation_wm2").alias("shortwave_radiation"),
+        F.col("soil_temperature_0_to_7cm_c").alias("soil_temperature"),
+        
+        # Ánh xạ cột AQI
+        F.col("pm25").alias("pm2_5"),
+        F.col("aqi").alias("us_aqi")
+    ).withColumn("hour", F.hour(F.col("timestamp"))) \
+     .withColumn("day_of_year", F.dayofyear(F.col("timestamp")))
 
-    # 6. Chạy Model Inference
-    # predictions = model.transform(features_stream)
-    predictions = features_stream # Tạm gán để chạy thử
-
-    # 7. Ghi kết quả ra Console để Debug
-    print("Đang khởi động luồng đọc Kafka...")
-    query = predictions.writeStream \
+def write_console_sink(df):
+    return df.writeStream \
         .format("console") \
-        .outputMode("append") \
+        .outputMode("update") \
         .option("truncate", "false") \
+        .trigger(processingTime="10 seconds") \
+        .start()
+
+def write_mongo_batch(batch_df, batch_id):
+    """Ghi từng Micro-batch của luồng Streaming vào MongoDB."""
+    MONGO_URI = "mongodb://spark_ingestion:writepassword456@localhost:27017/climate_db.realtime_alerts?authSource=admin"
+    
+    # Chọn các cột cảnh báo quan trọng
+    alert_cols = [
+        "station_id", "timestamp", "temp_c", "wind_speed", "precipitation", 
+        "pm2_5", "us_aqi"
+        # Thêm các cột target_storm_prob hoặc Alert_Code đã tính ở L4
+    ]
+    
+    batch_df.select(*alert_cols).write \
+        .format("mongodb") \
+        .option("spark.mongodb.write.connection.uri", MONGO_URI) \
+        .mode("append") \
+        .save()
+
+def main():
+    spark = SparkSession.builder \
+        .appName("Weather_Streaming_Inference") \
+        .config("spark.sql.session.timeZone", "UTC") \
+        .config("spark.sql.streaming.checkpointLocation", "/tmp/checkpoints/weather_stream") \
+        .getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    KAFKA_SERVERS = "localhost:9092"
+    
+    # 3. ĐỌC ĐA CHỦ ĐỀ: Truyền danh sách topic cách nhau bằng dấu phẩy
+    KAFKA_TOPIC = "weather.raw.stream,air_quality.raw.stream"
+    
+    print("[*] Đang khởi động Pipeline...")
+    
+    raw_stream = read_kafka_source(spark, KAFKA_SERVERS, KAFKA_TOPIC)
+    
+    l0_stream = parse_and_rename_l0(raw_stream)
+    
+    l1_l2_stream = apply_l1_l2_transforms(l0_stream)
+    
+    watermarked_stream = l1_l2_stream.withWatermark("timestamp", "2 hours")
+    
+    # Hàm này sẽ tự động chạy .ffill() để lấp đầy các ô trống giữa 2 luồng dữ liệu
+    l3_stream = apply_streaming_l3_stateful(watermarked_stream)
+    
+    predictions_stream = l3_stream # Tạm gán để test
+    
+
+    # 4. Ghi ra Sink (Console để debug + MongoDB để lưu trữ)
+    query = write_console_sink(predictions_stream)
+    print("[*] Bắt đầu đẩy dữ liệu vào MongoDB (realtime_alerts)...")
+    
+    # Ghi vào MongoDB bằng foreachBatch
+    query = predictions_stream.writeStream \
+        .foreachBatch(write_mongo_batch) \
+        .outputMode("update") \
+        .trigger(processingTime="10 seconds") \
         .start()
 
     query.awaitTermination()
