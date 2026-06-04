@@ -3,37 +3,15 @@ version: '3.8'
 networks:
   weather-net:
     driver: bridge
+  ingestion-net:
+    external: true
+    name: ingestion_kafka_network
 
 volumes:
   namenode-data:
   datanode-data:
 
 services:
-  zookeeper:
-    image: bitnamilegacy/zookeeper:3.9.2
-    container_name: zookeeper
-    networks:
-      - weather-net
-    ports:
-      - "2181:2181"
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-
-  kafka:
-    image: bitnamilegacy/kafka:3.7.0
-    container_name: kafka
-    networks:
-      - weather-net
-    ports:
-      - "9092:9092"
-    environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
-      - ALLOW_PLAINTEXT_LISTENER=yes
-    depends_on:
-      - zookeeper
-
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
@@ -65,6 +43,7 @@ services:
     container_name: spark-master
     networks:
       - weather-net
+      - ingestion-net
     environment:
       - SPARK_MODE=master
     ports:
@@ -80,6 +59,7 @@ services:
     container_name: spark-worker
     networks:
       - weather-net
+      - ingestion-net
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
@@ -87,6 +67,6 @@ services:
       - spark-master
     volumes:
       - ./:/workspace
+      - D:/Documents/Data Engineer/Bigdata/ml_models:/ml_models_local
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - spark-master
