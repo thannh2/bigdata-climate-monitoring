@@ -35,15 +35,12 @@ def setup_database():
     
     # 1. Collection: Dữ liệu thực tế
     db["climate_observations"].create_index([("station_id", ASCENDING), ("timestamp", DESCENDING)])
-    print("  - Đã tạo B-Tree Index cho climate_observations")
 
-    # 2. Collection: Dữ liệu dự đoán
-    db["climate_predictions"].create_index([("station_id", ASCENDING), ("target_timestamp", DESCENDING)])
-    print("  - Đã tạo B-Tree Index cho climate_predictions")
-    
-    # 3. Collection: Cảnh báo thời gian thực
+    # 2. Collection: Dự đoán thời gian thực (tự xóa sau 24h)
     db["realtime_alerts"].create_index("timestamp", expireAfterSeconds=86400)
-    print("  - Đã tạo TTL Index cho realtime_alerts (Tự động xóa sau 24h)")
+    
+    # 3. Collection: Quan trắc thời gian thực
+    db["realtime_observations"].create_index([("station_id", ASCENDING), ("timestamp", DESCENDING)])
 
     print("[*] Đang thiết lập Role-Based Access Control...")
     

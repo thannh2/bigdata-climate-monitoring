@@ -33,7 +33,7 @@ def _stream_command(script_path: Path) -> str:
     return (
         "{% set locations = dag_run.conf.get('locations', params.locations) %} "
         f'"{PYTHON_CMD}" "{script_path}" '
-        '--run-once'
+        '--run-once --poll-seconds 300'
         '{% if locations %} --locations {{ locations | join(" ") }}{% endif %}'
     )
 

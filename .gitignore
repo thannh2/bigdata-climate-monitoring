@@ -87,6 +87,7 @@ model/
 *.pickle
 *.joblib
 *.onnx
+mlflow.db
 
 # Docker and local services
 .docker/
