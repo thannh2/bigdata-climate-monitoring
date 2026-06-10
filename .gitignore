@@ -4,40 +4,66 @@
 !.env.example
 Ingestion/config/.env
 
-# Python virtual environments
+# Python environments
 .venv/
 venv/
 env/
+ENV/
 
-# Python cache and tooling
+# Python cache, build, and packaging output
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
+.Python
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.hypothesis/
 .coverage
 .coverage.*
 htmlcov/
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-# Notebook cache
+# Jupyter
 .ipynb_checkpoints/
 
-# Editor and OS files
+# IDE, editor, and OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Local runtime data
-data/
+# Logs
 logs/
 *.log
+derby.log
+
+# Local runtime data and generated datasets
+Data/
+data/
 checkpoint/
+checkpoints/
 exports/
+output/
+outputs/
+tmp/
+temp/
+*.parquet
+*.avro
+*.csv
+*.jsonl
+
+# Spark, Hive, and Airflow local state
 spark-warehouse/
 metastore_db/
-derby.log
 airflow.cfg
 webserver_config.py
 airflow-webserver.pid
@@ -51,6 +77,23 @@ airflow-webserver.pid
 
 # Image
 images/
+# MLflow and model artifacts
+mlruns/
+mlartifacts/
+mlartifact/
+models/
+model/
+*.pkl
+*.pickle
+*.joblib
+*.onnx
+mlflow.db
 
-# Local-only handover docs
+# Docker and local services
+.docker/
+docker-compose.override.yml
+
+# Local-only handover docs and generated images
 Ingestion/docs/
+air_quality_mllib_mlflow_spec.md
+images/

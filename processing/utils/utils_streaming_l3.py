@@ -1,63 +1,82 @@
 import pandas as pd
 from typing import Tuple, Iterator
 from pyspark.sql.streaming.state import GroupState, GroupStateTimeout
-from pyspark.sql.types import StructType
+from pyspark.sql import Row
+from pyspark.sql import functions as F
 
 def apply_streaming_l3_stateful(df):
     """Tính toán L3 Stateful bằng applyInPandasWithState cho luồng Streaming."""
     
-    # 1. Định nghĩa Output Schema (Thừa kế schema của L2 và thêm 5 cột L3)
-    output_schema = df.schema \
-        .add("pressure_delta_3h", "double") \
-        .add("wind_shear_U", "double") \
-        .add("wind_shear_V", "double") \
-        .add("temp_mean_6h", "double") \
-        .add("pm25_acc_12h", "double")
+    df = df.withColumn("pressure_delta_3h", F.lit(0.0).cast("double")) \
+           .withColumn("wind_shear_U", F.lit(0.0).cast("double")) \
+           .withColumn("wind_shear_V", F.lit(0.0).cast("double")) \
+           .withColumn("temp_mean_6h", F.lit(0.0).cast("double")) \
+           .withColumn("pm25_acc_12h", F.lit(0.0).cast("double"))
+           
+    output_schema = df.schema 
     
-    # 2. Định nghĩa State Schema (Chỉ lưu các cột cần thiết để tối ưu RAM)
-    state_schema = "timestamp timestamp, pressure double, wind_U double, wind_V double, temp_c double, pm2_5 double"
+    # ✅ THAY ĐỔI CHÍNH: Lưu timestamp dưới dạng LONG (epoch ms) thay vì timestamp
+    # Tránh hoàn toàn lỗi timetuple khi PySpark serialize state
+    state_schema = "timestamp_ms long, pressure double, wind_U double, wind_V double, temp_c double, pm2_5 double"
 
     def l3_state_update(key: Tuple[str], pdfs: Iterator[pd.DataFrame], state: GroupState) -> Iterator[pd.DataFrame]:
-        # Gộp tất cả các DataFrame trong Micro-batch hiện tại
         new_pdf = pd.concat(list(pdfs))
         
-        # Truy xuất trạng thái cũ từ bộ nhớ
         if state.exists:
-            state_dict = state.get[0] if isinstance(state.get, tuple) else state.get
-            state_pdf = pd.DataFrame(state_dict)
-            combined_pdf = pd.concat([state_pdf, new_pdf])
+            state_rows = state.get
+            state_pdf = pd.DataFrame([row.asDict() for row in state_rows])
+            
+            # Chuyển timestamp_ms (long) về datetime để dùng trong pandas
+            state_pdf["timestamp"] = pd.to_datetime(state_pdf["timestamp_ms"], unit="ms")
+            state_pdf = state_pdf.drop(columns=["timestamp_ms"])
+            
+            for col in new_pdf.columns:
+                if col not in state_pdf.columns:
+                    state_pdf[col] = None
+                    
+            combined_pdf = pd.concat([state_pdf, new_pdf], ignore_index=True)
         else:
             combined_pdf = new_pdf
             
-        # Sắp xếp theo chuỗi thời gian
         combined_pdf = combined_pdf.sort_values("timestamp").reset_index(drop=True)
 
-        #Áp dụng Forward Fill để lấp đầy các cảm biến bị lệch pha thời gian
-        combined_pdf = combined_pdf.ffill()
+        target_cols = ["pressure", "wind_U", "wind_V", "temp_c", "pm2_5"]
+        combined_pdf[target_cols] = combined_pdf[target_cols].ffill().bfill()
         
-        # Để an toàn hơn, lấp ngược (Backward fill) cho dòng đầu tiên nếu nó bị Null
-        combined_pdf = combined_pdf.bfill()
+        combined_pdf["pressure_delta_3h"] = combined_pdf["pressure"].diff(3).fillna(0.0)
+        combined_pdf["wind_shear_U"] = combined_pdf["wind_U"].diff(1).fillna(0.0)
+        combined_pdf["wind_shear_V"] = combined_pdf["wind_V"].diff(1).fillna(0.0)
+        combined_pdf["temp_mean_6h"] = combined_pdf["temp_c"].rolling(window=6, min_periods=1).mean().fillna(0.0)
+        combined_pdf["pm25_acc_12h"] = combined_pdf["pm2_5"].rolling(window=12, min_periods=1).sum().fillna(0.0)
         
-        # 3. Biến đổi Pandas (Vectorized)
-        combined_pdf["pressure_delta_3h"] = combined_pdf["pressure"] - combined_pdf["pressure"].shift(3)
-        combined_pdf["wind_shear_U"] = combined_pdf["wind_U"] - combined_pdf["wind_U"].shift(1)
-        combined_pdf["wind_shear_V"] = combined_pdf["wind_V"] - combined_pdf["wind_V"].shift(1)
-        combined_pdf["temp_mean_6h"] = combined_pdf["temp_c"].rolling(window=6, min_periods=1).mean()
-        combined_pdf["pm25_acc_12h"] = combined_pdf["pm2_5"].rolling(window=12, min_periods=1).sum()
+        new_cols = ["pressure_delta_3h", "wind_shear_U", "wind_shear_V", "temp_mean_6h", "pm25_acc_12h"]
+        for col in new_cols:
+            combined_pdf[col] = combined_pdf[col].astype("float64")
         
-        # 4. Cập nhật State (Giữ đúng 12 dòng mới nhất)
-        latest_12_rows = combined_pdf.tail(12)[["timestamp", "pressure", "wind_U", "wind_V", "temp_c", "pm2_5"]]
-        state.update(latest_12_rows.to_dict(orient="records"))
+        latest_12_rows = combined_pdf.tail(12)
+        state_list = []
+        for _, row in latest_12_rows[["timestamp", "pressure", "wind_U", "wind_V", "temp_c", "pm2_5"]].iterrows():
+            # Ép kiểu rõ ràng về dạng số nguyên thô (long) ngay tại đây
+            ts = pd.to_datetime(row["timestamp"])
+            ts_ms = int(ts.value // 1_000_000) # Lấy giá trị nanoseconds chia cho 1 triệu
+            
+            state_list.append((
+                ts_ms,
+                float(row["pressure"]),
+                float(row["wind_U"]),
+                float(row["wind_V"]),
+                float(row["temp_c"]),
+                float(row["pm2_5"])
+            ))
+        state.update(state_list)
         
-        # 5. Xuất kết quả (Chỉ trả về các dòng tương ứng với dữ liệu mới tới)
-        result_pdf = combined_pdf.tail(len(new_pdf))
+        result_pdf = combined_pdf.tail(len(new_pdf)).reset_index(drop=True)
         yield result_pdf
 
-    # Kích hoạt Stateful Process theo từng trạm
     return df.groupBy("station_id").applyInPandasWithState(
         func=l3_state_update,
         outputStructType=output_schema,
         stateStructType=state_schema,
         outputMode="update",
-        timeoutConf=GroupStateTimeout.NoTimeout()
+        timeoutConf=GroupStateTimeout.NoTimeout
     )

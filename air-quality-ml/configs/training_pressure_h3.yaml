@@ -1,0 +1,40 @@
+﻿task: regression
+horizon: 3
+target_col: target_pressure_3h
+prediction_col: prediction
+model_type: gbt
+model_name: weather_pressure_forecast_h3
+experiment_name: weather/forecast-pressure/h3
+threshold_col: null
+
+training:
+  label_col: target_pressure_3h
+  max_rows: null
+  dropna_label: true
+  features:
+    numeric:
+      - pressure
+      - pressure_delta_3h
+      - temp_c
+      - humidity
+      - wind_speed
+      - wind_U
+      - wind_V
+      - air_density
+      - theta_e
+      - hour_sin
+      - hour_cos
+      - coord_X
+      - coord_Y
+      - coord_Z
+    categorical:
+      - region
+      - city
+
+params:
+  maxDepth: 6
+  maxIter: 100
+  stepSize: 0.05
+  subsamplingRate: 0.85
+
+register_if_pass: true
