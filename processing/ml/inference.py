@@ -50,7 +50,6 @@ def load_all_forecast_models(tracking_uri: str, existing_models: dict = None):
     loaded_count = 0
     
     for name in all_model_names:
-        # CHỈ TẢI NẾU MODEL CHƯA CÓ TRONG DICT
         if name not in existing_models:
             model = load_mlflow_model(tracking_uri, name, version=1)
             if model:
@@ -62,53 +61,56 @@ def load_all_forecast_models(tracking_uri: str, existing_models: dict = None):
     print(f"[+] Hoàn tất! Đã tải thêm {loaded_count} mô hình. Tổng: {len(existing_models)}/{len(all_model_names)}.")
     
     return existing_models
-
 def apply_ml_predictions(batch_df: DataFrame, ml_models_dict: dict) -> DataFrame:
     if batch_df is None or batch_df.isEmpty():
         return None
     
-    # 1. Thêm region giả lập
+    # 1. Điền các giá trị mặc định nếu thiếu
     if "region" not in batch_df.columns:
         batch_df = batch_df.withColumn("region", F.lit("Vietnam"))
 
     if "city" in batch_df.columns:
         batch_df = batch_df.withColumn("city", F.col("city").cast("string"))
     else:
-        # Nếu không có city, dùng station_id thay thế vì station_id chính là city
         batch_df = batch_df.withColumn("city", F.col("station_id").cast("string"))
 
     result_df = batch_df
-    count = 0  # THÊM BIẾN ĐẾM
+    count = 0  
     
+    junk_cols = [
+        "features", "scaledFeatures", 
+        "region_idx", "city_idx", 
+        "region_ohe", "city_ohe", 
+        "rawPrediction", "probability"
+    ]
+
+    # 3. Lặp qua 36 models
     for model_name, model in ml_models_dict.items():
         try:
-            transformed_df = model.transform(result_df)
+            # Biến đổi trực tiếp
+            result_df = model.transform(result_df)
             
-            original_cols = set(result_df.columns)
-            new_cols = [c for c in transformed_df.columns if c not in original_cols]
-            pred_col = new_cols[-1] if new_cols else ("prediction" if "prediction" in transformed_df.columns else None)
-            
-            if pred_col:
-                prediction_subset = transformed_df.select(
-                    "station_id", 
-                    "timestamp", 
-                    F.col(pred_col).alias(model_name)
-                )
-                
-                result_df = result_df.join(
-                    prediction_subset, 
-                    on=["station_id", "timestamp"], 
-                    how="left"
-                )
-                
-                # GIẢI CỨU RAM: Cắt đứt execution plan mỗi 6 mô hình
-                count += 1
-                if count % 6 == 0:
-                    result_df = result_df.localCheckpoint()
-                    
+            # Kiểm tra xem cột 'prediction' có tồn tại không
+            if "prediction" in result_df.columns:
+                result_df = result_df.withColumnRenamed("prediction", model_name)
             else:
-                print(f"[!!!] Không tìm thấy cột dự đoán cho {model_name}")
-                result_df = result_df.withColumn(model_name, F.lit(None).cast("double"))
+                original_cols = set(result_df.columns)
+                new_cols = [c for c in result_df.columns if c not in original_cols]
+                if new_cols:
+                    result_df = result_df.withColumnRenamed(new_cols[-1], model_name)
+                else:
+                    print(f"[!!!] Không tìm thấy kết quả từ {model_name}")
+                    result_df = result_df.withColumn(model_name, F.lit(None).cast("double"))
+
+            # Xóa các cột trung gian để chuẩn bị cho model tiếp theo
+            for col in junk_cols:
+                if col in result_df.columns:
+                    result_df = result_df.drop(col)
+            
+            # Cắt đứt DAG để tránh StackOverflowError
+            count += 1
+            if count % 6 == 0:
+                result_df = result_df.localCheckpoint()
             
         except Exception as e:
             print(f"[!!!] Lỗi dự đoán {model_name}: {e}")
