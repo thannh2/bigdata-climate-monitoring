@@ -70,3 +70,22 @@ services:
       - D:/Documents/Data Engineer/Bigdata/ml_models:/ml_models_local
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      
+airflow-webserver:
+    image: apache/airflow:2.9.0
+    container_name: airflow-webserver
+    restart: always
+    networks:
+      - weather-net
+      - ingestion-net
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./plugins:/opt/airflow/plugins
+      - ../:/workspace
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    command: bash -c "airflow db init && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin && airflow webserver"
