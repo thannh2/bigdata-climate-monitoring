@@ -26,21 +26,36 @@ def setup_database():
     db = client["climate_db"]
     admin_db = client["admin"] 
     
-    # Dọn dẹp collection cũ để tránh rác hệ thống
     if "historical_weather" in db.list_collection_names():
         db.drop_collection("historical_weather")
         print("[*] Đã xóa collection cũ: historical_weather")
 
     print("[*] Đang cấu hình Indexes cho hệ thống mới...")
     
-    # 1. Collection: Dữ liệu thực tế
+    # =========================================================
+    # CẬP NHẬT INDEX VÀ TTL (TIME-TO-LIVE)
+    # =========================================================
+    TTL_SECONDS = 172800 # 48 giờ
+    
+    for coll_name in ["realtime_alerts", "realtime_observations"]:
+        try:
+            db[coll_name].drop_index("timestamp_1")
+        except OperationFailure:
+            pass
+
+    # 1. Collection: Dữ liệu thực tế / Batch (Lưu vĩnh viễn, KHÔNG CÓ TTL)
     db["climate_observations"].create_index([("station_id", ASCENDING), ("timestamp", DESCENDING)])
 
-    # 2. Collection: Dự đoán thời gian thực (tự xóa sau 24h)
-    db["realtime_alerts"].create_index("timestamp", expireAfterSeconds=86400)
+    # 2. Collection: Dự đoán thời gian thực (Có TTL)
+    db["realtime_alerts"].create_index("timestamp", expireAfterSeconds=TTL_SECONDS)
     
     # 3. Collection: Quan trắc thời gian thực
+    # a. Index phục vụ truy vấn (truy xuất dữ liệu nhanh cho Streamlit)
     db["realtime_observations"].create_index([("station_id", ASCENDING), ("timestamp", DESCENDING)])
+    # b. Index phục vụ TTL (tự động xóa rác sau 48h)
+    db["realtime_observations"].create_index("timestamp", expireAfterSeconds=TTL_SECONDS)
+
+    print(f"[*] Đã cấu hình xong cơ chế tự động xóa dữ liệu Streaming sau {TTL_SECONDS} giây.")
 
     print("[*] Đang thiết lập Role-Based Access Control...")
     
